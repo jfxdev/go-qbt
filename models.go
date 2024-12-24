@@ -6,12 +6,16 @@ import (
 )
 
 type Client struct {
-	BaseURL         string
-	Username        string
-	Password        string
+	config          Config
 	client          *http.Client
 	MaxLoginRetries int
 	RetryDelay      time.Duration
+}
+
+type Config struct {
+	BaseURL  string
+	Username string
+	Password string
 }
 
 type ListOptions struct {

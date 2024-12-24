@@ -11,16 +11,14 @@ import (
 	"time"
 )
 
-func New(baseURL, username, password string) (*Client, error) {
+func New(config Config) (*Client, error) {
 	jar, err := cookiejar.New(nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating cookie jar: %w", err)
 	}
 
 	return &Client{
-		BaseURL:         baseURL,
-		Username:        username,
-		Password:        password,
+		config:          config,
 		client:          &http.Client{Jar: jar},
 		MaxLoginRetries: 3,
 		RetryDelay:      2 * time.Second,
@@ -28,7 +26,7 @@ func New(baseURL, username, password string) (*Client, error) {
 }
 
 func (qb *Client) sendRequest(method, endpoint string, body io.Reader, headers map[string]string) (*http.Response, error) {
-	url := fmt.Sprintf("%s%s", qb.BaseURL, endpoint)
+	url := fmt.Sprintf("%s%s", qb.config.BaseURL, endpoint)
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
@@ -48,8 +46,8 @@ func (qb *Client) sendRequest(method, endpoint string, body io.Reader, headers m
 
 func (qb *Client) login() error {
 	data := url.Values{
-		"username": {qb.Username},
-		"password": {qb.Password},
+		"username": {qb.config.Username},
+		"password": {qb.config.Password},
 	}
 
 	headers := map[string]string{
