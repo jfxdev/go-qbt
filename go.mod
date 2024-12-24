@@ -1,3 +1,3 @@
-module github.com/jfxdev/go-qbittorrent
+module github.com/jfxdev/go-qbt
 
 go 1.23.2

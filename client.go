@@ -98,3 +98,22 @@ func (qb *Client) isCookieValid() bool {
 	defer resp.Body.Close()
 	return true
 }
+
+func (qb *Client) Close() error {
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	resp, err := qb.sendRequest("POST", "/api/v2/auth/logout", nil, headers)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("logout failed. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
