@@ -121,3 +121,31 @@ func (qb *Client) IncreaseTorrentsPriority(hash string) error {
 func (qb *Client) DecreaseTorrentsPriority(hash string) error {
 	return qb.updateTorrentStatus("decreasePrio", hash, nil)
 }
+
+func (qb *Client) AddTorrentTags(hash string, tags []string) error {
+	if err := qb.ensureLogin(); err != nil {
+		return err
+	}
+
+	data := url.Values{
+		"hashes": {hash},
+		"tags":   tags,
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	resp, err := qb.sendRequest("POST", "/api/v2/torrents/addTags", strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to set tags to torrent. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}

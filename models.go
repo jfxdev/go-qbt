@@ -44,6 +44,7 @@ type Torrent struct {
 	Hash          string  `json:"hash"`
 	InfoHashV1    string  `json:"infohash_v1"`
 	InfoHashV2    string  `json:"infohash_v2"`
+	MagnetURI     string  `json:"magnet_uri"`
 	Name          string  `json:"name"`
 	NumComplete   int     `json:"num_complete"`
 	NumIncomplete int     `json:"num_incomplete"`
