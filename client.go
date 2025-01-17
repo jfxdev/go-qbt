@@ -25,6 +25,12 @@ func New(config Config) (*Client, error) {
 	}, nil
 }
 
+func (qb *Client) Update(config Config) {
+	qb.mu.Lock()
+	qb.config = config
+	qb.mu.Unlock()
+}
+
 func (qb *Client) sendRequest(method, endpoint string, body io.Reader, headers map[string]string) (*http.Response, error) {
 	url := fmt.Sprintf("%s%s", qb.config.BaseURL, endpoint)
 	req, err := http.NewRequest(method, url, body)

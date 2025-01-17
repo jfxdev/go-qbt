@@ -2,10 +2,12 @@ package qbt
 
 import (
 	"net/http"
+	"sync"
 	"time"
 )
 
 type Client struct {
+	mu              sync.Mutex
 	config          Config
 	client          *http.Client
 	MaxLoginRetries int
