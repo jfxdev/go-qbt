@@ -29,7 +29,7 @@ type ListFilter struct {
 }
 
 type TorrentConfig struct {
-	Source       string
+	MagnetURI    string
 	Directory    string
 	Category     string
 	Paused       bool
@@ -61,4 +61,5 @@ type Torrent struct {
 	State         string  `json:"state"`
 	SuperSeeding  bool    `json:"super_seeding"`
 	Upspeed       int     `json:"upspeed"`
+	Tags          string  `json:"tags"`
 }

@@ -44,7 +44,7 @@ func (qb *Client) AddTorrentLink(opts TorrentConfig) error {
 	}
 
 	data := url.Values{
-		"urls":          {opts.Source},
+		"urls":          {opts.MagnetURI},
 		"savepath":      {opts.Directory},
 		"category":      {opts.Category},
 		"paused":        {fmt.Sprintf("%v", opts.Paused)},
