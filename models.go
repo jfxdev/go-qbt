@@ -41,6 +41,7 @@ type Torrent struct {
 	Category      string  `json:"category"`
 	CompletionOn  int64   `json:"completion_on"`
 	Dlspeed       int     `json:"dlspeed"`
+	Downloaded    int     `json:"downloaded"`
 	Eta           int     `json:"eta"`
 	ForceStart    bool    `json:"force_start"`
 	Hash          string  `json:"hash"`
@@ -61,5 +62,6 @@ type Torrent struct {
 	State         string  `json:"state"`
 	SuperSeeding  bool    `json:"super_seeding"`
 	Upspeed       int     `json:"upspeed"`
+	Uploaded      int     `json:"uploaded"`
 	Tags          string  `json:"tags"`
 }
