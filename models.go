@@ -2,6 +2,7 @@ package qbt
 
 import (
 	"net/http"
+	"net/http/cookiejar"
 	"sync"
 	"time"
 )
@@ -18,6 +19,7 @@ type Config struct {
 	BaseURL  string
 	Username string
 	Password string
+	jar      *cookiejar.Jar
 }
 
 type ListOptions struct {
@@ -36,7 +38,7 @@ type TorrentConfig struct {
 	SkipChecking bool
 }
 
-type Torrent struct {
+type TorrentResponse struct {
 	AddedOn       int     `json:"added_on"`
 	Category      string  `json:"category"`
 	CompletionOn  int64   `json:"completion_on"`
@@ -64,4 +66,12 @@ type Torrent struct {
 	Upspeed       int     `json:"upspeed"`
 	Uploaded      int     `json:"uploaded"`
 	Tags          string  `json:"tags"`
+}
+
+type MainDataResponse struct {
+	ServerState MainDataServerStateResponse `json:"server_state"`
+}
+
+type MainDataServerStateResponse struct {
+	FreeSpaceOnDisk int `json:"free_space_on_disk"`
 }

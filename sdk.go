@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/jfxdev/go-qbt/request"
 )
 
-func (qb *Client) ListTorrents(opts ListOptions) ([]Torrent, error) {
+func (qb *Client) ListTorrents(opts ListOptions) ([]*TorrentResponse, error) {
 	if err := qb.ensureLogin(); err != nil {
 		return nil, err
 	}
@@ -19,7 +21,10 @@ func (qb *Client) ListTorrents(opts ListOptions) ([]Torrent, error) {
 		params.Add("category", opts.Category)
 	}
 
-	resp, err := qb.sendRequest("GET", "/api/v2/torrents/info?"+params.Encode(), nil, nil)
+	resp, err := request.Do(http.MethodGet,
+		fmt.Sprintf("%s/api/v2/torrents/info?%s", qb.config.BaseURL, params.Encode()),
+		request.WithCookieJar(qb.config.jar),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -30,12 +35,12 @@ func (qb *Client) ListTorrents(opts ListOptions) ([]Torrent, error) {
 		return nil, fmt.Errorf("failed to fetch torrents. Status: %d, Response: %s", resp.StatusCode, body)
 	}
 
-	var torrents []Torrent
-	if err := json.NewDecoder(resp.Body).Decode(&torrents); err != nil {
+	var response []*TorrentResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
 
-	return torrents, nil
+	return response, nil
 }
 
 func (qb *Client) AddTorrentLink(opts TorrentConfig) error {
@@ -55,10 +60,16 @@ func (qb *Client) AddTorrentLink(opts TorrentConfig) error {
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
 
-	resp, err := qb.sendRequest("POST", "/api/v2/torrents/add", strings.NewReader(data.Encode()), headers)
+	resp, err := request.Do(http.MethodGet,
+		fmt.Sprintf("%s/api/v2/torrents/add", qb.config.BaseURL),
+		request.WithBody(strings.NewReader(data.Encode())),
+		request.WithCookieJar(qb.config.jar),
+		request.WithHeaders(headers),
+	)
 	if err != nil {
 		return err
 	}
+
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -84,7 +95,12 @@ func (qb *Client) updateTorrentStatus(action, hash string, optional map[string]s
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
 
-	resp, err := qb.sendRequest("POST", fmt.Sprintf("/api/v2/torrents/%s", action), strings.NewReader(data.Encode()), headers)
+	resp, err := request.Do(http.MethodPost,
+		fmt.Sprintf("%s/api/v2/torrents/%s", qb.config.BaseURL, action),
+		request.WithBody(strings.NewReader(data.Encode())),
+		request.WithCookieJar(qb.config.jar),
+		request.WithHeaders(headers),
+	)
 	if err != nil {
 		return err
 	}
@@ -136,7 +152,12 @@ func (qb *Client) AddTorrentTags(hash string, tags []string) error {
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
 
-	resp, err := qb.sendRequest("POST", "/api/v2/torrents/addTags", strings.NewReader(data.Encode()), headers)
+	resp, err := request.Do(http.MethodPost,
+		fmt.Sprintf("%s/api/v2/torrents/addTags", qb.config.BaseURL),
+		request.WithCookieJar(qb.config.jar),
+		request.WithBody(strings.NewReader(data.Encode())),
+		request.WithHeaders(headers),
+	)
 	if err != nil {
 		return err
 	}
@@ -148,4 +169,31 @@ func (qb *Client) AddTorrentTags(hash string, tags []string) error {
 	}
 
 	return nil
+}
+
+func (qb *Client) GetMainData() (*MainDataResponse, error) {
+	if err := qb.ensureLogin(); err != nil {
+		return nil, err
+	}
+
+	resp, err := request.Do(http.MethodGet,
+		fmt.Sprintf("%s/api/v2/sync/maindata", qb.config.BaseURL),
+		request.WithCookieJar(qb.config.jar),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to get main data. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	var result *MainDataResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return result, nil
 }
