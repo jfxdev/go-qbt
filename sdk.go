@@ -197,3 +197,30 @@ func (qb *Client) GetMainData() (*MainDataResponse, error) {
 
 	return result, nil
 }
+
+func (qb *Client) GetTransferInfo() (*TransferInfoResponse, error) {
+	if err := qb.ensureLogin(); err != nil {
+		return nil, err
+	}
+
+	resp, err := request.Do(http.MethodGet,
+		fmt.Sprintf("%s/api/v2/transfer/info", qb.config.BaseURL),
+		request.WithCookieJar(qb.config.jar),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to get transfer info. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	var result *TransferInfoResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return result, nil
+}

@@ -75,3 +75,14 @@ type MainDataResponse struct {
 type MainDataServerStateResponse struct {
 	FreeSpaceOnDisk int `json:"free_space_on_disk"`
 }
+
+type TransferInfoResponse struct {
+	DlInfoSpeed      int    `json:"dl_info_speed"`
+	DlInfoData       int    `json:"dl_info_data"`
+	UpInfoSpeed      int    `json:"up_info_speed"`
+	UpInfoData       int    `json:"up_info_data"`
+	DlRateLimit      int    `json:"dl_rate_limit"`
+	UpRateLimit      int    `json:"up_rate_limit"`
+	DhtNodes         int    `json:"dht_nodes"`
+	ConnectionStatus string `json:"connection_status"`
+}
