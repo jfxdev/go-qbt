@@ -7,29 +7,61 @@ import (
 	"time"
 )
 
+// Client is a high-level qBittorrent API client with cookie cache and retries.
 type Client struct {
-	mu              sync.Mutex
+	mu              sync.RWMutex
 	config          Config
 	client          *http.Client
 	MaxLoginRetries int
 	RetryDelay      time.Duration
+
+	// Internal enhancements for cookies and retries
+	cookieCache   *CookieCache
+	retryConfig   *RetryConfig
+	lastLoginTime time.Time
+	cookieValid   bool
+	cookieValidMu sync.RWMutex
 }
 
+// Config contains runtime client settings and credentials.
 type Config struct {
-	BaseURL  string
-	Username string
-	Password string
-	jar      *cookiejar.Jar
+	BaseURL        string
+	Username       string
+	Password       string
+	jar            *cookiejar.Jar
+	RequestTimeout time.Duration
+	MaxRetries     int
+	RetryBackoff   time.Duration
 }
 
+// CookieCache stores session cookies to reduce validation requests.
+type CookieCache struct {
+	mu         sync.RWMutex
+	cookies    map[string]*http.Cookie
+	expiryTime time.Time
+	lastUsed   time.Time
+}
+
+// RetryConfig configures retry behavior and backoff parameters.
+type RetryConfig struct {
+	MaxRetries     int
+	BaseDelay      time.Duration
+	MaxDelay       time.Duration
+	BackoffFactor  float64
+	RetryableCodes []int
+}
+
+// ListOptions filters listing endpoints.
 type ListOptions struct {
 	Category string
 }
 
+// ListFilter is deprecated; use ListOptions instead.
 type ListFilter struct {
 	Category string
 }
 
+// TorrentConfig configures new torrent creation.
 type TorrentConfig struct {
 	MagnetURI    string
 	Directory    string
@@ -38,6 +70,7 @@ type TorrentConfig struct {
 	SkipChecking bool
 }
 
+// TorrentResponse is a subset of torrent info returned by qBittorrent.
 type TorrentResponse struct {
 	AddedOn       int     `json:"added_on"`
 	Category      string  `json:"category"`
@@ -68,14 +101,17 @@ type TorrentResponse struct {
 	Tags          string  `json:"tags"`
 }
 
+// MainDataResponse represents a subset of sync/maindata response.
 type MainDataResponse struct {
 	ServerState MainDataServerStateResponse `json:"server_state"`
 }
 
+// MainDataServerStateResponse contains server metrics.
 type MainDataServerStateResponse struct {
 	FreeSpaceOnDisk int `json:"free_space_on_disk"`
 }
 
+// TransferInfoResponse represents global transfer information.
 type TransferInfoResponse struct {
 	DlInfoSpeed      int    `json:"dl_info_speed"`
 	DlInfoData       int    `json:"dl_info_data"`

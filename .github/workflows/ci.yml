@@ -1,0 +1,67 @@
+name: Tests and Benchmarks
+
+on:
+  pull_request:
+    paths:
+      - 'apps/backend/modules/go-qbt/**'
+      - '.github/workflows/ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-benchmark:
+    name: Test, Lint and Benchmark (Go)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'apps/backend/modules/go-qbt/go.mod'
+          check-latest: true
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+
+      - name: Run staticcheck
+        working-directory: apps/backend/modules/go-qbt
+        run: |
+          "$GOPATH/bin/staticcheck" ./...
+
+      - name: Run unit tests
+        working-directory: apps/backend/modules/go-qbt
+        run: |
+          go test -v ./...
+
+      - name: Run benchmarks (summary only)
+        working-directory: apps/backend/modules/go-qbt
+        run: |
+          go test -bench=. -benchmem -run=^$ | tee benchmark.txt
+          echo "\nBenchmark summary:" && grep -E "^Benchmark" benchmark.txt || true
+
+      - name: Upload benchmark artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-qbt-benchmarks
+          path: apps/backend/modules/go-qbt/benchmark.txt
+          retention-days: 7
