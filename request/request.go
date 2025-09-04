@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Estrutura que contém as configurações da requisição
+// Options that configure the HTTP request
 type RequestOptions struct {
 	Timeout        time.Duration
 	Body           io.Reader
@@ -16,26 +16,41 @@ type RequestOptions struct {
 	CookieJar      http.CookieJar
 	UpdateCookies  bool
 	PreRequestHook func() error
+	Method         string // HTTP method to use (GET, POST, etc.)
 }
 
-// Tipo de função para aplicar opções à RequestOptions
+// Function type used to apply functional options to RequestOptions
 type RequestOption func(*RequestOptions)
 
-// WithTimeout define um tempo limite para a requisição
+// WithMethod sets the HTTP method for the request
+func WithMethod(method string) RequestOption {
+	return func(o *RequestOptions) {
+		o.Method = method
+	}
+}
+
+// WithTimeout sets a timeout for the request (in seconds)
 func WithTimeout(seconds int) RequestOption {
 	return func(o *RequestOptions) {
 		o.Timeout = time.Duration(seconds) * time.Second
 	}
 }
 
-// WithBody define um corpo para a requisição
+// WithTimeoutDuration sets a timeout using a time.Duration
+func WithTimeoutDuration(duration time.Duration) RequestOption {
+	return func(o *RequestOptions) {
+		o.Timeout = duration
+	}
+}
+
+// WithBody sets the request body
 func WithBody(body io.Reader) RequestOption {
 	return func(o *RequestOptions) {
 		o.Body = body
 	}
 }
 
-// WithHeader adiciona um cabeçalho à requisição
+// WithHeader adds a header to the request
 func WithHeader(key, value string) RequestOption {
 	return func(o *RequestOptions) {
 		if o.Headers == nil {
@@ -45,7 +60,7 @@ func WithHeader(key, value string) RequestOption {
 	}
 }
 
-// Adiciona múltiplos cabeçalhos de uma vez
+// WithHeaders adds multiple headers at once
 func WithHeaders(headers map[string]string) RequestOption {
 	return func(o *RequestOptions) {
 		if o.Headers == nil {
@@ -57,78 +72,85 @@ func WithHeaders(headers map[string]string) RequestOption {
 	}
 }
 
-// WithContext permite definir um contexto para a requisição
+// WithContext sets the context for the request
 func WithContext(ctx context.Context) RequestOption {
 	return func(o *RequestOptions) {
 		o.Ctx = ctx
 	}
 }
 
-// Usa um CookieJar para armazenar cookies entre requisições
+// WithCookieJar sets the CookieJar used to persist cookies across requests
 func WithCookieJar(jar http.CookieJar) RequestOption {
 	return func(o *RequestOptions) {
 		o.CookieJar = jar
 	}
 }
 
-// Define um hook que será executado antes da requisição
+// WithUpdateCookies persists response cookies into the provided CookieJar
 func WithUpdateCookies() RequestOption {
 	return func(o *RequestOptions) {
 		o.UpdateCookies = true
 	}
 }
 
-// Define um hook que será executado antes da requisição
+// WithPreRequestHook sets a hook executed right before the request is sent
 func WithPreRequestHook(hook func() error) RequestOption {
 	return func(o *RequestOptions) {
 		o.PreRequestHook = hook
 	}
 }
 
-// Execute a HTTP request com opções personalizadas
+// Do executes an HTTP request with the provided options
 func Do(method, url string, opts ...RequestOption) (*http.Response, error) {
-	// Configuração padrão
+	// Default options
 	options := &RequestOptions{
-		Timeout: 10 * time.Second, // Default de 10s
+		Timeout: 10 * time.Second, // 10s default
 		Ctx:     context.Background(),
 		Body:    nil,
+		Method:  method, // use the provided method
 	}
 
-	// Aplicar todas as opções passadas
+	// Apply all provided options
 	for _, opt := range opts {
 		opt(options)
 	}
 
-	// Criar um cliente HTTP com timeout configurado
+	// Create an HTTP client with the configured timeout
 	client := &http.Client{Timeout: options.Timeout}
 
-	// Se houver um CookieJar, usa ele no client
+	// Attach CookieJar if provided
 	if options.CookieJar != nil {
 		client.Jar = options.CookieJar
 	}
 
-	// Criar a requisição
-	req, err := http.NewRequestWithContext(options.Ctx, http.MethodPost, url, options.Body)
+	// Run pre-request hook if configured
+	if options.PreRequestHook != nil {
+		if err := options.PreRequestHook(); err != nil {
+			return nil, err
+		}
+	}
+
+	// Build the request using the proper method
+	req, err := http.NewRequestWithContext(options.Ctx, options.Method, url, options.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	// Adicionar cabeçalhos
+	// Add headers
 	for k, v := range options.Headers {
 		req.Header.Set(k, v)
 	}
 
-	// Executar a requisição
+	// Execute the request
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 
-	// Salva os cookies da resposta no CookieJar
-	if options.UpdateCookies {
+	// Save response cookies to the CookieJar if requested
+	if options.UpdateCookies && options.CookieJar != nil {
 		options.CookieJar.SetCookies(req.URL, resp.Cookies())
 	}
 
-	// Executar a requisição
 	return resp, nil
 }

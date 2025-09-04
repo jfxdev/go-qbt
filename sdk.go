@@ -1,6 +1,7 @@
 package qbt
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,29 +12,74 @@ import (
 	"github.com/jfxdev/go-qbt/request"
 )
 
-func (qb *Client) ListTorrents(opts ListOptions) ([]*TorrentResponse, error) {
-	if err := qb.ensureLogin(); err != nil {
-		return nil, err
-	}
+// Helper to perform requests with automatic retry
+func (qb *Client) doWithRetry(method, endpoint string, body io.Reader, headers map[string]string) (*http.Response, error) {
+	return qb.doWithRetryAndContext(context.Background(), method, endpoint, body, headers)
+}
 
+func (qb *Client) doWithRetryAndContext(ctx context.Context, method, endpoint string, body io.Reader, headers map[string]string) (*http.Response, error) {
+	var resp *http.Response
+	var err error
+
+	err = qb.retryWithBackoff(func() error {
+		// Ensure we are logged in
+		if err := qb.ensureLogin(); err != nil {
+			return fmt.Errorf("failed to ensure login: %w", err)
+		}
+
+		// Create a request context with timeout if not provided
+		reqCtx := ctx
+		if reqCtx == context.Background() {
+			var cancel context.CancelFunc
+			reqCtx, cancel = context.WithTimeout(ctx, qb.config.RequestTimeout)
+			defer cancel()
+		}
+
+		// Perform the request
+		resp, err = request.Do(method, endpoint,
+			request.WithBody(body),
+			request.WithHeaders(headers),
+			request.WithCookieJar(qb.config.jar),
+			request.WithContext(reqCtx),
+		)
+
+		if err != nil {
+			return err
+		}
+
+		// Retry on retryable status codes
+		if qb.isRetryableStatusCode(resp.StatusCode) {
+			return fmt.Errorf("retryable status code: %d", resp.StatusCode)
+		}
+
+		return nil
+	}, fmt.Sprintf("%s %s", method, endpoint))
+
+	return resp, err
+}
+
+func (qb *Client) isRetryableStatusCode(statusCode int) bool {
+	for _, code := range qb.retryConfig.RetryableCodes {
+		if statusCode == code {
+			return true
+		}
+	}
+	return false
+}
+
+func (qb *Client) ListTorrents(opts ListOptions) ([]*TorrentResponse, error) {
 	params := url.Values{}
 	if opts.Category != "" {
 		params.Add("category", opts.Category)
 	}
 
-	resp, err := request.Do(http.MethodGet,
-		fmt.Sprintf("%s/api/v2/torrents/info?%s", qb.config.BaseURL, params.Encode()),
-		request.WithCookieJar(qb.config.jar),
-	)
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/info?%s", qb.config.BaseURL, params.Encode())
+
+	resp, err := qb.doWithRetry(http.MethodGet, endpoint, nil, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list torrents: %w", err)
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("failed to fetch torrents. Status: %d, Response: %s", resp.StatusCode, body)
-	}
 
 	var response []*TorrentResponse
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
@@ -44,10 +90,6 @@ func (qb *Client) ListTorrents(opts ListOptions) ([]*TorrentResponse, error) {
 }
 
 func (qb *Client) AddTorrentLink(opts TorrentConfig) error {
-	if err := qb.ensureLogin(); err != nil {
-		return err
-	}
-
 	data := url.Values{
 		"urls":          {opts.MagnetURI},
 		"savepath":      {opts.Directory},
@@ -60,16 +102,12 @@ func (qb *Client) AddTorrentLink(opts TorrentConfig) error {
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
 
-	resp, err := request.Do(http.MethodGet,
-		fmt.Sprintf("%s/api/v2/torrents/add", qb.config.BaseURL),
-		request.WithBody(strings.NewReader(data.Encode())),
-		request.WithCookieJar(qb.config.jar),
-		request.WithHeaders(headers),
-	)
-	if err != nil {
-		return err
-	}
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/add", qb.config.BaseURL)
 
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to add torrent: %w", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -82,10 +120,6 @@ func (qb *Client) AddTorrentLink(opts TorrentConfig) error {
 
 // Reusable pause/resume function
 func (qb *Client) updateTorrentStatus(action, hash string, optional map[string]string) error {
-	if err := qb.ensureLogin(); err != nil {
-		return err
-	}
-
 	data := url.Values{"hashes": {hash}}
 	for k, v := range optional {
 		data[k] = []string{v}
@@ -95,14 +129,11 @@ func (qb *Client) updateTorrentStatus(action, hash string, optional map[string]s
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
 
-	resp, err := request.Do(http.MethodPost,
-		fmt.Sprintf("%s/api/v2/torrents/%s", qb.config.BaseURL, action),
-		request.WithBody(strings.NewReader(data.Encode())),
-		request.WithCookieJar(qb.config.jar),
-		request.WithHeaders(headers),
-	)
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/%s", qb.config.BaseURL, action)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to %s torrent: %w", action, err)
 	}
 	defer resp.Body.Close()
 
@@ -139,10 +170,6 @@ func (qb *Client) DecreaseTorrentsPriority(hash string) error {
 }
 
 func (qb *Client) AddTorrentTags(hash string, tags []string) error {
-	if err := qb.ensureLogin(); err != nil {
-		return err
-	}
-
 	data := url.Values{
 		"hashes": {hash},
 		"tags":   tags,
@@ -152,14 +179,11 @@ func (qb *Client) AddTorrentTags(hash string, tags []string) error {
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
 
-	resp, err := request.Do(http.MethodPost,
-		fmt.Sprintf("%s/api/v2/torrents/addTags", qb.config.BaseURL),
-		request.WithCookieJar(qb.config.jar),
-		request.WithBody(strings.NewReader(data.Encode())),
-		request.WithHeaders(headers),
-	)
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/addTags", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to add tags: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -172,23 +196,13 @@ func (qb *Client) AddTorrentTags(hash string, tags []string) error {
 }
 
 func (qb *Client) GetMainData() (*MainDataResponse, error) {
-	if err := qb.ensureLogin(); err != nil {
-		return nil, err
-	}
+	endpoint := fmt.Sprintf("%s/api/v2/sync/maindata", qb.config.BaseURL)
 
-	resp, err := request.Do(http.MethodGet,
-		fmt.Sprintf("%s/api/v2/sync/maindata", qb.config.BaseURL),
-		request.WithCookieJar(qb.config.jar),
-	)
+	resp, err := qb.doWithRetry(http.MethodGet, endpoint, nil, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get main data: %w", err)
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("failed to get main data. Status: %d, Response: %s", resp.StatusCode, body)
-	}
 
 	var result *MainDataResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -199,23 +213,13 @@ func (qb *Client) GetMainData() (*MainDataResponse, error) {
 }
 
 func (qb *Client) GetTransferInfo() (*TransferInfoResponse, error) {
-	if err := qb.ensureLogin(); err != nil {
-		return nil, err
-	}
+	endpoint := fmt.Sprintf("%s/api/v2/transfer/info", qb.config.BaseURL)
 
-	resp, err := request.Do(http.MethodGet,
-		fmt.Sprintf("%s/api/v2/transfer/info", qb.config.BaseURL),
-		request.WithCookieJar(qb.config.jar),
-	)
+	resp, err := qb.doWithRetry(http.MethodGet, endpoint, nil, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get transfer info: %w", err)
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("failed to get transfer info. Status: %d, Response: %s", resp.StatusCode, body)
-	}
 
 	var result *TransferInfoResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -223,4 +227,56 @@ func (qb *Client) GetTransferInfo() (*TransferInfoResponse, error) {
 	}
 
 	return result, nil
+}
+
+// New context-aware methods for better control
+func (qb *Client) ListTorrentsWithContext(ctx context.Context, opts ListOptions) ([]*TorrentResponse, error) {
+	params := url.Values{}
+	if opts.Category != "" {
+		params.Add("category", opts.Category)
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/info?%s", qb.config.BaseURL, params.Encode())
+
+	resp, err := qb.doWithRetryAndContext(ctx, http.MethodGet, endpoint, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list torrents: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var response []*TorrentResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return response, nil
+}
+
+func (qb *Client) AddTorrentLinkWithContext(ctx context.Context, opts TorrentConfig) error {
+	data := url.Values{
+		"urls":          {opts.MagnetURI},
+		"savepath":      {opts.Directory},
+		"category":      {opts.Category},
+		"paused":        {fmt.Sprintf("%v", opts.Paused)},
+		"skip_checking": {fmt.Sprintf("%v", opts.SkipChecking)},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/add", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetryAndContext(ctx, http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to add torrent: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to add torrent. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
 }
