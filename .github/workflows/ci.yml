@@ -3,8 +3,7 @@ name: Tests and Benchmarks
 on:
   pull_request:
     paths:
-      - 'apps/backend/modules/go-qbt/**'
-      - '.github/workflows/ci.yml'
+      - '**'
 
 permissions:
   contents: read
@@ -25,7 +24,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: 'apps/backend/modules/go-qbt/go.mod'
+          #go-version-file: 'apps/backend/modules/go-qbt/go.mod'
           check-latest: true
 
       - name: Cache Go modules
@@ -43,17 +42,17 @@ jobs:
           go install honnef.co/go/tools/cmd/staticcheck@latest
 
       - name: Run staticcheck
-        working-directory: apps/backend/modules/go-qbt
+        #working-directory: apps/backend/modules/go-qbt
         run: |
           "$GOPATH/bin/staticcheck" ./...
 
       - name: Run unit tests
-        working-directory: apps/backend/modules/go-qbt
+        #working-directory: apps/backend/modules/go-qbt
         run: |
           go test -v ./...
 
       - name: Run benchmarks (summary only)
-        working-directory: apps/backend/modules/go-qbt
+        #working-directory: apps/backend/modules/go-qbt
         run: |
           go test -bench=. -benchmem -run=^$ | tee benchmark.txt
           echo "\nBenchmark summary:" && grep -E "^Benchmark" benchmark.txt || true
@@ -63,5 +62,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: go-qbt-benchmarks
-          path: apps/backend/modules/go-qbt/benchmark.txt
+          path: benchmark.txt
           retention-days: 7
