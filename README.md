@@ -58,49 +58,49 @@ if err != nil {
 }
 defer client.Close()
 
-// List torrents (automatic retry)
+// List torrents (automatic retry and cookie management)
 torrents, err := client.ListTorrents(qbt.ListOptions{})
 if err != nil {
     log.Printf("Error: %v", err)
 }
-```
 
-## 🔄 Usage with Context
-
-```go
-// Context with custom timeout
-ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-defer cancel()
-
-// Add torrent with context
-err := client.AddTorrentLinkWithContext(ctx, torrentConfig)
+// Add torrent via magnet link
+err = client.AddTorrentLink(qbt.TorrentConfig{
+    MagnetURI: "magnet:?xt=urn:btih:...",
+    Directory: "/downloads",
+    Category:  "movies",
+    Paused:    false,
+})
+if err != nil {
+    log.Printf("Error adding torrent: %v", err)
+}
 ```
 
 ## 🚀 Available Operations
 
 ### Torrent Management
-- `ListTorrents()` - List all torrents
-- `AddTorrentLink()` - Add a torrent via magnet link
-- `PauseTorrents()` - Pause torrents
-- `ResumeTorrents()` - Resume torrents
-- `DeleteTorrents()` - Delete torrents
-- `IncreaseTorrentsPriority()` - Increase priority
-- `DecreaseTorrentsPriority()` - Decrease priority
-- `AddTorrentTags()` - Add tags
+- `ListTorrents(opts ListOptions)` - List all torrents with optional filtering
+- `AddTorrentLink(opts TorrentConfig)` - Add a torrent via magnet link
+- `PauseTorrents(hash string)` - Pause specific torrent
+- `ResumeTorrents(hash string)` - Resume specific torrent
+- `DeleteTorrents(hash string, deleteFiles bool)` - Delete torrent with optional file deletion
+- `IncreaseTorrentsPriority(hash string)` - Increase torrent priority
+- `DecreaseTorrentsPriority(hash string)` - Decrease torrent priority
+- `AddTorrentTags(hash string, tags []string)` - Add tags to torrent
 
 ### System Information
-- `GetMainData()` - Main server data
-- `GetTransferInfo()` - Transfer information
+- `GetMainData()` - Get main server data and sync information
+- `GetTransferInfo()` - Get transfer statistics and information
+- `GetAppVersion()` - Get qBittorrent application version
+- `GetAPIVersion()` - Get Web API version
+- `GetBuildInfo()` - Get build information
 
 ## ⚙️ Advanced Settings
 
 ### Timeouts
 ```go
-// Global timeout
+// Global timeout for all operations
 config.RequestTimeout = 60 * time.Second
-
-// Per-operation timeout
-ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 ```
 
 ### Retries
@@ -134,11 +134,74 @@ The client provides detailed logs for:
 
 ## 🧪 Examples
 
-See the `examples/` directory for complete usage examples:
-- Basic usage
-- Batch operations
-- Worker pools
-- Advanced settings
+### Complete Usage Example
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    "time"
+    
+    "github.com/jfxdev/go-qbt"
+)
+
+func main() {
+    // Configure client
+    config := qbt.Config{
+        BaseURL:        "http://localhost:8080",
+        Username:       "admin",
+        Password:       "password",
+        RequestTimeout: 30 * time.Second,
+        MaxRetries:     3,
+        RetryBackoff:   2 * time.Second,
+    }
+    
+    // Create client
+    client, err := qbt.New(config)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer client.Close()
+    
+    // Get system information
+    version, err := client.GetAppVersion()
+    if err != nil {
+        log.Printf("Error getting version: %v", err)
+    } else {
+        fmt.Printf("qBittorrent version: %s\n", version)
+    }
+    
+    // List torrents
+    torrents, err := client.ListTorrents(qbt.ListOptions{})
+    if err != nil {
+        log.Printf("Error listing torrents: %v", err)
+        return
+    }
+    
+    fmt.Printf("Found %d torrents\n", len(torrents))
+    
+    // Add a new torrent
+    err = client.AddTorrentLink(qbt.TorrentConfig{
+        MagnetURI: "magnet:?xt=urn:btih:...",
+        Directory: "/downloads",
+        Category:  "movies",
+        Paused:    false,
+    })
+    if err != nil {
+        log.Printf("Error adding torrent: %v", err)
+    }
+    
+    // Get transfer info
+    info, err := client.GetTransferInfo()
+    if err != nil {
+        log.Printf("Error getting transfer info: %v", err)
+    } else {
+        fmt.Printf("Download speed: %d bytes/s\n", info.DlSpeed)
+        fmt.Printf("Upload speed: %d bytes/s\n", info.UpSpeed)
+    }
+}
+```
 
 ## 🔒 Security
 
@@ -149,9 +212,10 @@ See the `examples/` directory for complete usage examples:
 ## 🚨 Error Handling
 
 The client implements robust error handling:
-- **Automatic retry**: For temporary failures
+- **Automatic retry**: For temporary failures with exponential backoff
 - **Graceful fallback**: Elegant degradation on errors
-- **Context cancellation**: Supports operation cancellation
+- **Smart cookie management**: Automatic re-authentication when needed
+- **Timeout protection**: Prevents hanging operations
 
 ## 📈 Benefits of the Improvements
 

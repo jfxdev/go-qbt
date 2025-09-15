@@ -76,7 +76,7 @@ func (qb *Client) Update(config Config) {
 	qb.invalidateCookies()
 }
 
-func (qb *Client) login() error {
+func (qb *Client) loginWithContext(ctx context.Context) error {
 	data := url.Values{
 		"username": {qb.config.Username},
 		"password": {qb.config.Password},
@@ -86,7 +86,8 @@ func (qb *Client) login() error {
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), qb.config.RequestTimeout)
+	// Create a timeout context for the login request
+	loginCtx, cancel := context.WithTimeout(ctx, qb.config.RequestTimeout)
 	defer cancel()
 
 	resp, err := request.Do(http.MethodPost,
@@ -95,7 +96,7 @@ func (qb *Client) login() error {
 		request.WithHeaders(headers),
 		request.WithCookieJar(qb.config.jar),
 		request.WithUpdateCookies(),
-		request.WithContext(ctx),
+		request.WithContext(loginCtx),
 	)
 	if err != nil {
 		return err
@@ -117,15 +118,27 @@ func (qb *Client) login() error {
 	return nil
 }
 
-func (qb *Client) ensureLogin() error {
+func (qb *Client) ensureLoginWithContext(ctx context.Context) error {
 	// Use cached validity to avoid unnecessary requests
 	if qb.isCookieValidCached() {
 		return nil
 	}
 
-	// Try login with smart retry
+	// Try login with smart retry and context
+	return qb.retryWithBackoffWithContext(ctx, func() error {
+		return qb.loginWithContext(ctx)
+	}, "login")
+}
+
+func (qb *Client) ensureLoginSimple() error {
+	// Use cached validity to avoid unnecessary requests
+	if qb.isCookieValidCached() {
+		return nil
+	}
+
+	// Try login with simple retry (no context)
 	return qb.retryWithBackoff(func() error {
-		return qb.login()
+		return qb.loginWithContext(context.Background())
 	}, "login")
 }
 
@@ -207,6 +220,45 @@ func (qb *Client) retryWithBackoff(operation func() error, operationName string)
 			log.Printf("%s failed (attempt %d/%d), retrying in %v: %v",
 				operationName, attempt+1, qb.retryConfig.MaxRetries+1, delay, lastErr)
 			time.Sleep(delay)
+		}
+	}
+
+	return fmt.Errorf("%s failed after %d attempts: %w",
+		operationName, qb.retryConfig.MaxRetries+1, lastErr)
+}
+
+func (qb *Client) retryWithBackoffWithContext(ctx context.Context, operation func() error, operationName string) error {
+	var lastErr error
+
+	for attempt := 0; attempt <= qb.retryConfig.MaxRetries; attempt++ {
+		// Check if context is cancelled before each attempt
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("%s cancelled: %w", operationName, ctx.Err())
+		default:
+		}
+
+		if err := operation(); err == nil {
+			if attempt > 0 {
+				log.Printf("%s succeeded after %d retries", operationName, attempt)
+			}
+			return nil
+		} else {
+			lastErr = err
+		}
+
+		if attempt < qb.retryConfig.MaxRetries {
+			delay := qb.calculateBackoffDelay(attempt)
+			log.Printf("%s failed (attempt %d/%d), retrying in %v: %v",
+				operationName, attempt+1, qb.retryConfig.MaxRetries+1, delay, lastErr)
+
+			// Use context-aware sleep
+			select {
+			case <-time.After(delay):
+				// Continue to next attempt
+			case <-ctx.Done():
+				return fmt.Errorf("%s cancelled during retry: %w", operationName, ctx.Err())
+			}
 		}
 	}
 

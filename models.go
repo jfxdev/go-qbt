@@ -108,11 +108,28 @@ type MainDataResponse struct {
 
 // MainDataServerStateResponse contains server metrics.
 type MainDataServerStateResponse struct {
-	FreeSpaceOnDisk int `json:"free_space_on_disk"`
+	FreeSpaceOnDisk       int    `json:"free_space_on_disk"`
+	AllTimeDownloaded     int    `json:"alltime_dl"`
+	AllTimeUploaded       int    `json:"alltime_ul"`
+	ConnectionStatus      string `json:"connection_status"`
+	GlobalRatio           string `json:"global_ratio"`
+	LastExternalAddressV4 string `json:"last_external_address_v4"`
+	LastExternalAddressV6 string `json:"last_external_address_v6"`
 }
 
 // TransferInfoResponse represents global transfer information.
 type TransferInfoResponse struct {
+	DlInfoSpeed      int    `json:"dl_info_speed"`
+	DlInfoData       int    `json:"dl_info_data"`
+	UpInfoSpeed      int    `json:"up_info_speed"`
+	UpInfoData       int    `json:"up_info_data"`
+	DlRateLimit      int    `json:"dl_rate_limit"`
+	UpRateLimit      int    `json:"up_rate_limit"`
+	DhtNodes         int    `json:"dht_nodes"`
+	ConnectionStatus string `json:"connection_status"`
+}
+
+type BuildInfoResponse struct {
 	DlInfoSpeed      int    `json:"dl_info_speed"`
 	DlInfoData       int    `json:"dl_info_data"`
 	UpInfoSpeed      int    `json:"up_info_speed"`

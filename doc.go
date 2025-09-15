@@ -4,7 +4,7 @@ Package qbt provides a high-level, production-ready client for the qBittorrent W
 Highlights:
   - Smart cookie/session management with in-memory cache and periodic cleanup
   - Automatic retries with exponential backoff for transient failures
-  - Context-aware APIs with configurable per-request timeouts
+  - Configurable timeouts and retry policies
   - Clean, well-typed models for common endpoints
 
 Quick start:
