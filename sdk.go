@@ -74,6 +74,13 @@ func (qb *Client) ListTorrents(opts ListOptions) ([]*TorrentResponse, error) {
 		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
 
+	for _, torrent := range response {
+		torrent.MagnetLink, err = ParseMagnetLink(torrent.MagnetURI)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse magnet link: %w", err)
+		}
+	}
+
 	return response, nil
 }
 
@@ -178,6 +185,268 @@ func (qb *Client) AddTorrentTags(hash string, tags []string) error {
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to set tags to torrent. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
+func (qb *Client) DeleteTorrentTags(hash string, tags []string) error {
+	data := url.Values{
+		"hashes": {hash},
+		"tags":   tags,
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/removeTags", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to remove tags: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to remove tags from torrent. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
+func (qb *Client) SetCategory(hash string, category string) error {
+	data := url.Values{
+		"hashes":   {hash},
+		"category": {category},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/setCategory", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to set category: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to set category for torrent. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
+func (qb *Client) RemoveCategory(hash string) error {
+	data := url.Values{
+		"hashes":   {hash},
+		"category": {""}, // Empty category removes the category
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/setCategory", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to remove category: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to remove category from torrent. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
+func (qb *Client) ListTorrentFiles(hash string) ([]*TorrentFile, error) {
+	params := url.Values{}
+	params.Add("hash", hash)
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/files?%s", qb.config.BaseURL, params.Encode())
+
+	resp, err := qb.doWithRetry(http.MethodGet, endpoint, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list torrent files: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Read the response body first to avoid context cancellation during JSON decoding
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to list torrent files. Status: %d, Response: %s", resp.StatusCode, string(body))
+	}
+
+	var files []*TorrentFile
+	if err := json.Unmarshal(body, &files); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return files, nil
+}
+
+func (qb *Client) ForceRecheck(hash string) error {
+	data := url.Values{
+		"hashes": {hash},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/recheck", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to force recheck: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to force recheck torrent. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
+func (qb *Client) ForceReannounce(hash string) error {
+	data := url.Values{
+		"hashes": {hash},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/reannounce", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to force reannounce: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to force reannounce torrent. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
+func (qb *Client) GetTorrent(hash string) (*TorrentResponse, error) {
+	params := url.Values{}
+	params.Add("hashes", hash)
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/info?%s", qb.config.BaseURL, params.Encode())
+
+	resp, err := qb.doWithRetry(http.MethodGet, endpoint, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get torrent: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Read the response body first to avoid context cancellation during JSON decoding
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get torrent. Status: %d, Response: %s", resp.StatusCode, string(body))
+	}
+
+	var torrents []*TorrentResponse
+	if err := json.Unmarshal(body, &torrents); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	if len(torrents) == 0 {
+		return nil, fmt.Errorf("torrent not found with hash: %s", hash)
+	}
+
+	// Parse magnet link for the torrent
+	torrent := torrents[0]
+	torrent.MagnetLink, err = ParseMagnetLink(torrent.MagnetURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse magnet link: %w", err)
+	}
+
+	return torrent, nil
+}
+
+func (qb *Client) GetTorrentProperties(hash string) (*TorrentProperties, error) {
+	params := url.Values{}
+	params.Add("hash", hash)
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/properties?%s", qb.config.BaseURL, params.Encode())
+
+	resp, err := qb.doWithRetry(http.MethodGet, endpoint, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get torrent properties: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Read the response body first to avoid context cancellation during JSON decoding
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get torrent properties. Status: %d, Response: %s", resp.StatusCode, string(body))
+	}
+
+	var properties TorrentProperties
+	if err := json.Unmarshal(body, &properties); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return &properties, nil
+}
+
+func (qb *Client) StopTorrent(hash string) error {
+	return qb.updateTorrentStatus("pause", hash, nil)
+}
+
+func (qb *Client) StartTorrent(hash string) error {
+	return qb.updateTorrentStatus("resume", hash, nil)
+}
+
+func (qb *Client) ForceStart(hash string) error {
+	data := url.Values{
+		"hashes": {hash},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/setForceStart", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to force start torrent: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to force start torrent. Status: %d, Response: %s", resp.StatusCode, body)
 	}
 
 	return nil
@@ -295,4 +564,495 @@ func (qb *Client) GetBuildInfo() (*TransferInfoResponse, error) {
 	}
 
 	return &result, nil
+}
+
+// ===== ESSENTIAL FEATURES FOR SEEDBOX =====
+
+// GetTorrentTrackers gets tracker information for a torrent
+func (qb *Client) GetTorrentTrackers(hash string) ([]*TorrentTracker, error) {
+	params := url.Values{}
+	params.Add("hash", hash)
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/trackers?%s", qb.config.BaseURL, params.Encode())
+
+	resp, err := qb.doWithRetry(http.MethodGet, endpoint, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get torrent trackers: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get torrent trackers. Status: %d, Response: %s", resp.StatusCode, string(body))
+	}
+
+	var trackers []*TorrentTracker
+	if err := json.Unmarshal(body, &trackers); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return trackers, nil
+}
+
+// GetTorrentPeers gets peer information for a torrent
+func (qb *Client) GetTorrentPeers(hash string) ([]*TorrentPeer, error) {
+	params := url.Values{}
+	params.Add("hash", hash)
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/peers?%s", qb.config.BaseURL, params.Encode())
+
+	resp, err := qb.doWithRetry(http.MethodGet, endpoint, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get torrent peers: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get torrent peers. Status: %d, Response: %s", resp.StatusCode, string(body))
+	}
+
+	var peers []*TorrentPeer
+	if err := json.Unmarshal(body, &peers); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return peers, nil
+}
+
+// GetGlobalSettings gets qBittorrent global settings
+func (qb *Client) GetGlobalSettings() (*GlobalSettings, error) {
+	endpoint := fmt.Sprintf("%s/api/v2/app/preferences", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodGet, endpoint, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get global settings: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get global settings. Status: %d, Response: %s", resp.StatusCode, string(body))
+	}
+
+	var settings GlobalSettings
+	if err := json.Unmarshal(body, &settings); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return &settings, nil
+}
+
+// SetGlobalSettings sets qBittorrent global settings
+func (qb *Client) SetGlobalSettings(settings GlobalSettings) error {
+	jsonData, err := json.Marshal(settings)
+	if err != nil {
+		return fmt.Errorf("failed to marshal settings: %w", err)
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/json",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/app/setPreferences", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(string(jsonData)), headers)
+	if err != nil {
+		return fmt.Errorf("failed to set global settings: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to set global settings. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
+// GetCategories gets all categories
+func (qb *Client) GetCategories() (map[string]Category, error) {
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/categories", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodGet, endpoint, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get categories: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get categories. Status: %d, Response: %s", resp.StatusCode, string(body))
+	}
+
+	var categories map[string]Category
+	if err := json.Unmarshal(body, &categories); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return categories, nil
+}
+
+// CreateCategory creates a new category
+func (qb *Client) CreateCategory(name, savePath string) error {
+	data := url.Values{
+		"category": {name},
+		"savePath": {savePath},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/createCategory", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to create category: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to create category. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
+// DeleteCategory removes a category
+func (qb *Client) DeleteCategory(name string) error {
+	data := url.Values{
+		"category": {name},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/deleteCategory", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to delete category: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to delete category. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
+// GetLogs gets system logs
+func (qb *Client) GetLogs(normal bool, info bool, warning bool, critical bool, lastKnownID int) ([]*LogEntry, error) {
+	params := url.Values{}
+	params.Add("normal", fmt.Sprintf("%v", normal))
+	params.Add("info", fmt.Sprintf("%v", info))
+	params.Add("warning", fmt.Sprintf("%v", warning))
+	params.Add("critical", fmt.Sprintf("%v", critical))
+	params.Add("last_known_id", fmt.Sprintf("%d", lastKnownID))
+
+	endpoint := fmt.Sprintf("%s/api/v2/log/main?%s", qb.config.BaseURL, params.Encode())
+
+	resp, err := qb.doWithRetry(http.MethodGet, endpoint, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get logs: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get logs. Status: %d, Response: %s", resp.StatusCode, string(body))
+	}
+
+	var logs []*LogEntry
+	if err := json.Unmarshal(body, &logs); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return logs, nil
+}
+
+// GetNetworkInfo gets network information
+func (qb *Client) GetNetworkInfo() (*NetworkInfo, error) {
+	endpoint := fmt.Sprintf("%s/api/v2/transfer/info", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodGet, endpoint, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get network info: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get network info. Status: %d, Response: %s", resp.StatusCode, string(body))
+	}
+
+	var info NetworkInfo
+	if err := json.Unmarshal(body, &info); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return &info, nil
+}
+
+// SetDownloadSpeedLimit sets the download speed limit
+func (qb *Client) SetDownloadSpeedLimit(limit int) error {
+	data := url.Values{
+		"dl_limit": {fmt.Sprintf("%d", limit)},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/transfer/setDownloadLimit", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to set download speed limit: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to set download speed limit. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
+// SetUploadSpeedLimit sets the upload speed limit
+func (qb *Client) SetUploadSpeedLimit(limit int) error {
+	data := url.Values{
+		"up_limit": {fmt.Sprintf("%d", limit)},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/transfer/setUploadLimit", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to set upload speed limit: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to set upload speed limit. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
+// ToggleSpeedLimits toggles speed limits
+func (qb *Client) ToggleSpeedLimits() error {
+	endpoint := fmt.Sprintf("%s/api/v2/transfer/toggleSpeedLimitsMode", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, nil, nil)
+	if err != nil {
+		return fmt.Errorf("failed to toggle speed limits: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to toggle speed limits. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
+// SetTorrentDownloadLimit sets download speed limit for a specific torrent
+func (qb *Client) SetTorrentDownloadLimit(hash string, limit int) error {
+	data := url.Values{
+		"hashes":   {hash},
+		"dl_limit": {fmt.Sprintf("%d", limit)},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/setDownloadLimit", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to set torrent download limit: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to set torrent download limit. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
+// SetTorrentUploadLimit sets upload speed limit for a specific torrent
+func (qb *Client) SetTorrentUploadLimit(hash string, limit int) error {
+	data := url.Values{
+		"hashes":   {hash},
+		"up_limit": {fmt.Sprintf("%d", limit)},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/setUploadLimit", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to set torrent upload limit: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to set torrent upload limit. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
+// SetTorrentShareLimit sets ratio limit for a specific torrent
+func (qb *Client) SetTorrentShareLimit(hash string, ratioLimit float64, seedingTimeLimit int) error {
+	data := url.Values{
+		"hashes":           {hash},
+		"ratioLimit":       {fmt.Sprintf("%.2f", ratioLimit)},
+		"seedingTimeLimit": {fmt.Sprintf("%d", seedingTimeLimit)},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/setShareLimits", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to set torrent share limit: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to set torrent share limit. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
+// GetRSSFeeds gets configured RSS feeds
+func (qb *Client) GetRSSFeeds(withData bool) (map[string]RSSFeed, error) {
+	params := url.Values{}
+	params.Add("withData", fmt.Sprintf("%v", withData))
+
+	endpoint := fmt.Sprintf("%s/api/v2/rss/items?%s", qb.config.BaseURL, params.Encode())
+
+	resp, err := qb.doWithRetry(http.MethodGet, endpoint, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get RSS feeds: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get RSS feeds. Status: %d, Response: %s", resp.StatusCode, string(body))
+	}
+
+	var feeds map[string]RSSFeed
+	if err := json.Unmarshal(body, &feeds); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return feeds, nil
+}
+
+// AddRSSFeed adds a new RSS feed
+func (qb *Client) AddRSSFeed(feedURL, path string) error {
+	data := url.Values{}
+	data.Set("url", feedURL)
+	data.Set("path", path)
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/rss/addFeed", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to add RSS feed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to add RSS feed. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
+// RemoveRSSFeed removes an RSS feed
+func (qb *Client) RemoveRSSFeed(path string) error {
+	data := url.Values{
+		"path": {path},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/rss/removeItem", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to remove RSS feed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to remove RSS feed. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
 }

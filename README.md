@@ -87,13 +87,99 @@ if err != nil {
 - `IncreaseTorrentsPriority(hash string)` - Increase torrent priority
 - `DecreaseTorrentsPriority(hash string)` - Decrease torrent priority
 - `AddTorrentTags(hash string, tags []string)` - Add tags to torrent
+- `DeleteTorrentTags(hash string, tags []string)` - Remove tags from torrent
+- `SetCategory(hash string, category string)` - Set torrent category
+- `RemoveCategory(hash string)` - Remove torrent category
+- `GetTorrent(hash string)` - Get specific torrent information
+- `GetTorrentProperties(hash string)` - Get detailed torrent properties
+- `GetTorrentFiles(hash string)` - Get torrent file list
+- `GetTorrentTrackers(hash string)` - Get torrent tracker information
+- `GetTorrentPeers(hash string)` - Get torrent peer information
+- `ForceRecheck(hash string)` - Force torrent recheck
+- `ForceReannounce(hash string)` - Force torrent reannounce
+- `ForceStart(hash string)` - Force start torrent
+- `SetTorrentDownloadLimit(hash string, limit int)` - Set torrent download speed limit
+- `SetTorrentUploadLimit(hash string, limit int)` - Set torrent upload speed limit
+- `SetTorrentShareLimit(hash string, ratioLimit float64, seedingTimeLimit int)` - Set torrent share limits
 
-### System Information
+### Categories Management
+- `GetCategories()` - Get all categories
+- `CreateCategory(name, savePath string)` - Create new category
+- `DeleteCategory(name string)` - Delete category
+
+### Global Settings & Configuration
+- `GetGlobalSettings()` - Get global qBittorrent settings
+- `SetGlobalSettings(settings GlobalSettings)` - Set global qBittorrent settings
+- `SetDownloadSpeedLimit(limit int)` - Set global download speed limit
+- `SetUploadSpeedLimit(limit int)` - Set global upload speed limit
+- `ToggleSpeedLimits()` - Toggle speed limits mode
+
+### System Information & Monitoring
 - `GetMainData()` - Get main server data and sync information
 - `GetTransferInfo()` - Get transfer statistics and information
+- `GetNetworkInfo()` - Get network information
 - `GetAppVersion()` - Get qBittorrent application version
 - `GetAPIVersion()` - Get Web API version
 - `GetBuildInfo()` - Get build information
+- `GetLogs(normal, info, warning, critical bool, lastKnownID int)` - Get system logs
+
+### RSS Feeds Management
+- `GetRSSFeeds(withData bool)` - Get RSS feeds
+- `AddRSSFeed(url, path string)` - Add RSS feed
+- `RemoveRSSFeed(path string)` - Remove RSS feed
+
+## 🌱 Essential Features for Seedbox
+
+This SDK has been specially optimized for seedbox usage, including essential features for daily management:
+
+### 📊 Advanced Monitoring
+- **Trackers**: Monitor status and performance of all trackers
+- **Peers**: Track connections, speeds and countries of peers
+- **Logs**: Access detailed system logs for debugging
+- **Network**: Monitor network information and DHT connections
+
+### ⚙️ Speed Control
+- **Global Limits**: Configure speed limits for download/upload
+- **Per-Torrent Limits**: Individual speed control per torrent
+- **Ratio Management**: Configure ratio limits and seeding time
+- **Toggle Limits**: Quickly enable/disable speed limits
+
+### 🗂️ Organization and Categorization
+- **Categories**: Create and manage categories to organize torrents
+- **Tags**: Add and remove tags for better organization
+- **Paths**: Configure specific paths per category
+
+### 🔧 Advanced Settings
+- **Global Settings**: Access and modify all qBittorrent settings
+- **RSS Feeds**: Configure RSS feeds for download automation
+- **Recheck/Reannounce**: Force checks and announcements when needed
+
+### 💡 Typical Seedbox Use Cases
+```go
+// Monitor tracker performance
+trackers, err := client.GetTorrentTrackers("torrent_hash")
+if err != nil {
+    log.Printf("Error getting trackers: %v", err)
+}
+
+// Configure ratio limit for seeding
+err = client.SetTorrentShareLimit("torrent_hash", 2.0, 168) // 2.0 ratio, 168 hours
+if err != nil {
+    log.Printf("Error configuring ratio: %v", err)
+}
+
+// Get system logs for debugging
+logs, err := client.GetLogs(true, true, true, true, 0)
+if err != nil {
+    log.Printf("Error getting logs: %v", err)
+}
+
+// Configure category for organization
+err = client.CreateCategory("movies", "/downloads/movies")
+if err != nil {
+    log.Printf("Error creating category: %v", err)
+}
+```
 
 ## ⚙️ Advanced Settings
 
