@@ -32,6 +32,7 @@ type Config struct {
 	RequestTimeout time.Duration
 	MaxRetries     int
 	RetryBackoff   time.Duration
+	Debug          bool // Enable debug logging for session management
 }
 
 // CookieCache stores session cookies to reduce validation requests.

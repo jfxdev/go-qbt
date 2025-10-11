@@ -114,7 +114,9 @@ func (qb *Client) loginWithContext(ctx context.Context) error {
 	qb.setCookieValid(true)
 	qb.lastLoginTime = time.Now()
 
-	log.Println("Login successful, cookies cached")
+	if qb.config.Debug {
+		log.Println("Login successful, cookies cached")
+	}
 	return nil
 }
 
@@ -127,18 +129,6 @@ func (qb *Client) ensureLoginWithContext(ctx context.Context) error {
 	// Try login with smart retry and context
 	return qb.retryWithBackoffWithContext(ctx, func() error {
 		return qb.loginWithContext(ctx)
-	}, "login")
-}
-
-func (qb *Client) ensureLoginSimple() error {
-	// Use cached validity to avoid unnecessary requests
-	if qb.isCookieValidCached() {
-		return nil
-	}
-
-	// Try login with simple retry (no context)
-	return qb.retryWithBackoff(func() error {
-		return qb.loginWithContext(context.Background())
 	}, "login")
 }
 
@@ -207,7 +197,7 @@ func (qb *Client) retryWithBackoff(operation func() error, operationName string)
 
 	for attempt := 0; attempt <= qb.retryConfig.MaxRetries; attempt++ {
 		if err := operation(); err == nil {
-			if attempt > 0 {
+			if attempt > 0 && qb.config.Debug {
 				log.Printf("%s succeeded after %d retries", operationName, attempt)
 			}
 			return nil
@@ -217,8 +207,10 @@ func (qb *Client) retryWithBackoff(operation func() error, operationName string)
 
 		if attempt < qb.retryConfig.MaxRetries {
 			delay := qb.calculateBackoffDelay(attempt)
-			log.Printf("%s failed (attempt %d/%d), retrying in %v: %v",
-				operationName, attempt+1, qb.retryConfig.MaxRetries+1, delay, lastErr)
+			if qb.config.Debug {
+				log.Printf("%s failed (attempt %d/%d), retrying in %v: %v",
+					operationName, attempt+1, qb.retryConfig.MaxRetries+1, delay, lastErr)
+			}
 			time.Sleep(delay)
 		}
 	}
@@ -239,7 +231,7 @@ func (qb *Client) retryWithBackoffWithContext(ctx context.Context, operation fun
 		}
 
 		if err := operation(); err == nil {
-			if attempt > 0 {
+			if attempt > 0 && qb.config.Debug {
 				log.Printf("%s succeeded after %d retries", operationName, attempt)
 			}
 			return nil
@@ -249,8 +241,10 @@ func (qb *Client) retryWithBackoffWithContext(ctx context.Context, operation fun
 
 		if attempt < qb.retryConfig.MaxRetries {
 			delay := qb.calculateBackoffDelay(attempt)
-			log.Printf("%s failed (attempt %d/%d), retrying in %v: %v",
-				operationName, attempt+1, qb.retryConfig.MaxRetries+1, delay, lastErr)
+			if qb.config.Debug {
+				log.Printf("%s failed (attempt %d/%d), retrying in %v: %v",
+					operationName, attempt+1, qb.retryConfig.MaxRetries+1, delay, lastErr)
+			}
 
 			// Use context-aware sleep
 			select {
@@ -286,7 +280,9 @@ func (qb *Client) startCookieCleanup() {
 		if qb.isCookieExpired() {
 			qb.setCookieValid(false)
 			qb.cookieCache.clear()
-			log.Println("Cookies expired, cleared from cache")
+			if qb.config.Debug {
+				log.Println("Cookies expired, cleared from cache")
+			}
 		}
 	}
 }

@@ -321,3 +321,70 @@ func TestRetryWithBackoffFailure(t *testing.T) {
 		t.Errorf("Unexpected error message: %v", err)
 	}
 }
+
+func TestInvalidateCookiesOnAuthError(t *testing.T) {
+	client, err := New(Config{
+		BaseURL:        "http://localhost:8080",
+		Username:       "test",
+		Password:       "test",
+		RequestTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Set cookies as valid to simulate a logged in state
+	client.setCookieValid(true)
+	client.lastLoginTime = time.Now()
+
+	if !client.isCookieValidCached() {
+		t.Error("Cookie should be valid initially")
+	}
+
+	// Simulate receiving an auth error
+	client.invalidateCookies()
+
+	// Cookies should now be invalid
+	if client.isCookieValidCached() {
+		t.Error("Cookie should be invalid after invalidateCookies()")
+	}
+
+	// Cookie cache should be empty
+	if len(client.cookieCache.cookies) != 0 {
+		t.Errorf("Cookie cache should be empty, got %d cookies", len(client.cookieCache.cookies))
+	}
+}
+
+func TestDebugMode(t *testing.T) {
+	// Test with debug disabled (default)
+	client, err := New(Config{
+		BaseURL:        "http://localhost:8080",
+		Username:       "test",
+		Password:       "test",
+		RequestTimeout: 30 * time.Second,
+		Debug:          false,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	if client.config.Debug {
+		t.Error("Debug should be disabled by default")
+	}
+
+	// Test with debug enabled
+	clientDebug, err := New(Config{
+		BaseURL:        "http://localhost:8080",
+		Username:       "test",
+		Password:       "test",
+		RequestTimeout: 30 * time.Second,
+		Debug:          true,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client with debug: %v", err)
+	}
+
+	if !clientDebug.config.Debug {
+		t.Error("Debug should be enabled when set to true")
+	}
+}

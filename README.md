@@ -45,8 +45,28 @@ config := qbt.Config{
     RequestTimeout: 45 * time.Second,  // Custom timeout
     MaxRetries:     5,                 // Number of attempts
     RetryBackoff:   2 * time.Second,   // Base delay between attempts
+    Debug:          false,             // Enable debug logging (default: false)
 }
 ```
+
+### Debug Mode
+
+Enable debug logging to see detailed information about:
+- Login attempts and success
+- Cookie expiration events
+- Retry attempts with delays
+- Operation failures and retries
+
+```go
+config := qbt.Config{
+    BaseURL:  "http://localhost:8080",
+    Username: "admin",
+    Password: "password",
+    Debug:    true,  // Enable verbose logging
+}
+```
+
+**Note:** In production environments, keep `Debug: false` to avoid excessive logging.
 
 ## 💻 Basic Usage
 
@@ -206,11 +226,20 @@ config.RetryBackoff = 1 * time.Second  // Base delay
 
 ## 🔍 Monitoring and Logs
 
-The client provides detailed logs for:
-- Login attempts
-- Failures and retries
-- Cookie expiration
-- Successful operations
+When debug mode is enabled (`Debug: true`), the client provides detailed logs for:
+- Login attempts and success
+- Failures and retries with attempt counts
+- Cookie expiration events
+- Successful operations after retries
+
+**Example debug output:**
+```
+Login successful, cookies cached
+GET /api/v2/torrents/info failed (attempt 1/3), retrying in 2s: authentication error: status code 403
+Login successful, cookies cached
+GET /api/v2/torrents/info succeeded after 1 retries
+Cookies expired, cleared from cache
+```
 
 ## 📊 Performance Metrics
 
@@ -241,6 +270,7 @@ func main() {
         RequestTimeout: 30 * time.Second,
         MaxRetries:     3,
         RetryBackoff:   2 * time.Second,
+        Debug:          false, // Set to true for verbose logging
     }
     
     // Create client
@@ -301,7 +331,18 @@ The client implements robust error handling:
 - **Automatic retry**: For temporary failures with exponential backoff
 - **Graceful fallback**: Elegant degradation on errors
 - **Smart cookie management**: Automatic re-authentication when needed
+- **Session expiration handling**: Detects 401/403 errors and automatically re-authenticates
 - **Timeout protection**: Prevents hanging operations
+
+### Session Expiration Fix
+
+The client now properly handles qBittorrent session timeouts. When the server returns a 403 (Forbidden) or 401 (Unauthorized) error due to an expired session:
+
+1. The client automatically **invalidates the cached cookies**
+2. The retry mechanism **forces a new login** on the next attempt
+3. The operation is **retried seamlessly** without user intervention
+
+This fixes the issue where, after several hours, the client would continuously return "forbidden" errors because the qBittorrent Web UI session had expired (configured via `WebUISessionTimeout` in qBittorrent settings), while the client still considered its cached cookies as valid.
 
 ## 📈 Benefits of the Improvements
 

@@ -35,6 +35,12 @@ func (qb *Client) doWithRetry(method, endpoint string, body io.Reader, headers m
 			return err
 		}
 
+		// Check for authentication errors and invalidate cookies
+		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+			qb.invalidateCookies()
+			return fmt.Errorf("authentication error: status code %d", resp.StatusCode)
+		}
+
 		// Retry on retryable status codes
 		if qb.isRetryableStatusCode(resp.StatusCode) {
 			return fmt.Errorf("retryable status code: %d", resp.StatusCode)
