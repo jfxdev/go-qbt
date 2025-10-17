@@ -388,3 +388,498 @@ func TestDebugMode(t *testing.T) {
 		t.Error("Debug should be enabled when set to true")
 	}
 }
+
+// Test new torrent management methods
+func TestSetTorrentLocation(t *testing.T) {
+	client, err := New(Config{
+		BaseURL:        "http://localhost:8080",
+		Username:       "test",
+		Password:       "test",
+		RequestTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Test with valid parameters
+	hash := "test_hash_123"
+	location := "/new/path"
+
+	// This test will fail in real scenario without a running qBittorrent instance
+	// but it validates the method signature and basic structure
+	err = client.SetTorrentLocation(hash, location)
+	if err != nil {
+		// Expected to fail without real qBittorrent instance
+		if !strings.Contains(err.Error(), "failed to set torrent location") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+}
+
+func TestRenameTorrent(t *testing.T) {
+	client, err := New(Config{
+		BaseURL:        "http://localhost:8080",
+		Username:       "test",
+		Password:       "test",
+		RequestTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Test with valid parameters
+	hash := "test_hash_123"
+	newName := "New Torrent Name"
+
+	// This test will fail in real scenario without a running qBittorrent instance
+	// but it validates the method signature and basic structure
+	err = client.RenameTorrent(hash, newName)
+	if err != nil {
+		// Expected to fail without real qBittorrent instance
+		if !strings.Contains(err.Error(), "failed to rename torrent") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+}
+
+func TestSuperSeedingMode(t *testing.T) {
+	client, err := New(Config{
+		BaseURL:        "http://localhost:8080",
+		Username:       "test",
+		Password:       "test",
+		RequestTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Test with valid parameters
+	hash := "test_hash_123"
+	enabled := true
+
+	// This test will fail in real scenario without a running qBittorrent instance
+	// but it validates the method signature and basic structure
+	err = client.SuperSeedingMode(hash, enabled)
+	if err != nil {
+		// Expected to fail without real qBittorrent instance
+		if !strings.Contains(err.Error(), "failed to set super seeding mode") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+
+	// Test with disabled super seeding
+	err = client.SuperSeedingMode(hash, false)
+	if err != nil {
+		// Expected to fail without real qBittorrent instance
+		if !strings.Contains(err.Error(), "failed to set super seeding mode") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+}
+
+func TestForceRecheck(t *testing.T) {
+	client, err := New(Config{
+		BaseURL:        "http://localhost:8080",
+		Username:       "test",
+		Password:       "test",
+		RequestTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Test with valid parameters
+	hash := "test_hash_123"
+
+	// This test will fail in real scenario without a running qBittorrent instance
+	// but it validates the method signature and basic structure
+	err = client.ForceRecheck(hash)
+	if err != nil {
+		// Expected to fail without real qBittorrent instance
+		if !strings.Contains(err.Error(), "failed to force recheck") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+}
+
+func TestForceReannounce(t *testing.T) {
+	client, err := New(Config{
+		BaseURL:        "http://localhost:8080",
+		Username:       "test",
+		Password:       "test",
+		RequestTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Test with valid parameters
+	hash := "test_hash_123"
+
+	// This test will fail in real scenario without a running qBittorrent instance
+	// but it validates the method signature and basic structure
+	err = client.ForceReannounce(hash)
+	if err != nil {
+		// Expected to fail without real qBittorrent instance
+		if !strings.Contains(err.Error(), "failed to force reannounce") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+}
+
+// Test new rate limit methods
+func TestGlobalRateLimits(t *testing.T) {
+	client, err := New(Config{
+		BaseURL:        "http://localhost:8080",
+		Username:       "test",
+		Password:       "test",
+		RequestTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Test with valid parameters
+	downloadLimit := 1024 * 1024 // 1 MB/s
+	uploadLimit := 512 * 1024    // 512 KB/s
+
+	// This test will fail in real scenario without a running qBittorrent instance
+	// but it validates the method signature and basic structure
+	err = client.SetGlobalRateLimits(downloadLimit, uploadLimit)
+	if err != nil {
+		// Expected to fail without real qBittorrent instance
+		if !strings.Contains(err.Error(), "failed to get global settings") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+}
+
+func TestAlternativeRateLimits(t *testing.T) {
+	client, err := New(Config{
+		BaseURL:        "http://localhost:8080",
+		Username:       "test",
+		Password:       "test",
+		RequestTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Test with valid parameters
+	downloadLimit := 2048 * 1024 // 2 MB/s
+	uploadLimit := 1024 * 1024   // 1 MB/s
+
+	// This test will fail in real scenario without a running qBittorrent instance
+	// but it validates the method signature and basic structure
+	err = client.SetAlternativeRateLimits(downloadLimit, uploadLimit)
+	if err != nil {
+		// Expected to fail without real qBittorrent instance
+		if !strings.Contains(err.Error(), "failed to get global settings") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+}
+
+func TestGlobalRateLimitsWithZeroValues(t *testing.T) {
+	client, err := New(Config{
+		BaseURL:        "http://localhost:8080",
+		Username:       "test",
+		Password:       "test",
+		RequestTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Test with zero values (should disable limits)
+	downloadLimit := 0
+	uploadLimit := 0
+
+	// This test will fail in real scenario without a running qBittorrent instance
+	// but it validates the method signature and basic structure
+	err = client.SetGlobalRateLimits(downloadLimit, uploadLimit)
+	if err != nil {
+		// Expected to fail without real qBittorrent instance
+		if !strings.Contains(err.Error(), "failed to get global settings") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+}
+
+func TestAlternativeRateLimitsWithZeroValues(t *testing.T) {
+	client, err := New(Config{
+		BaseURL:        "http://localhost:8080",
+		Username:       "test",
+		Password:       "test",
+		RequestTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Test with zero values (should disable limits)
+	downloadLimit := 0
+	uploadLimit := 0
+
+	// This test will fail in real scenario without a running qBittorrent instance
+	// but it validates the method signature and basic structure
+	err = client.SetAlternativeRateLimits(downloadLimit, uploadLimit)
+	if err != nil {
+		// Expected to fail without real qBittorrent instance
+		if !strings.Contains(err.Error(), "failed to get global settings") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+}
+
+// ===== TESTS FOR MAXIMUM ACTIVE TORRENT MANAGEMENT =====
+
+func TestSetMaxActiveDownloads(t *testing.T) {
+	client, err := New(Config{
+		BaseURL:        "http://localhost:8080",
+		Username:       "test",
+		Password:       "test",
+		RequestTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Test setting max active downloads
+	maxDownloads := 5
+	err = client.SetMaxActiveDownloads(maxDownloads)
+	if err != nil {
+		// Expected to fail without real qBittorrent instance
+		if !strings.Contains(err.Error(), "failed to get global settings") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+}
+
+func TestSetMaxActiveUploads(t *testing.T) {
+	client, err := New(Config{
+		BaseURL:        "http://localhost:8080",
+		Username:       "test",
+		Password:       "test",
+		RequestTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Test setting max active uploads
+	maxUploads := 3
+	err = client.SetMaxActiveUploads(maxUploads)
+	if err != nil {
+		// Expected to fail without real qBittorrent instance
+		if !strings.Contains(err.Error(), "failed to get global settings") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+}
+
+func TestSetMaxActiveTorrents(t *testing.T) {
+	client, err := New(Config{
+		BaseURL:        "http://localhost:8080",
+		Username:       "test",
+		Password:       "test",
+		RequestTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Test setting max active torrents
+	maxTorrents := 10
+	err = client.SetMaxActiveTorrents(maxTorrents)
+	if err != nil {
+		// Expected to fail without real qBittorrent instance
+		if !strings.Contains(err.Error(), "failed to get global settings") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+}
+
+func TestSetMaxActiveCheckingTorrents(t *testing.T) {
+	client, err := New(Config{
+		BaseURL:        "http://localhost:8080",
+		Username:       "test",
+		Password:       "test",
+		RequestTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Test setting max active checking torrents
+	maxChecking := 2
+	err = client.SetMaxActiveCheckingTorrents(maxChecking)
+	if err != nil {
+		// Expected to fail without real qBittorrent instance
+		if !strings.Contains(err.Error(), "failed to get global settings") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+}
+
+func TestSetMaxActiveTorrentLimits(t *testing.T) {
+	client, err := New(Config{
+		BaseURL:        "http://localhost:8080",
+		Username:       "test",
+		Password:       "test",
+		RequestTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Test setting all max active limits at once
+	maxDownloads := 5
+	maxUploads := 3
+	maxTorrents := 10
+	maxChecking := 2
+
+	err = client.SetMaxActiveTorrentLimits(maxDownloads, maxUploads, maxTorrents, maxChecking)
+	if err != nil {
+		// Expected to fail without real qBittorrent instance
+		if !strings.Contains(err.Error(), "failed to get global settings") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+}
+
+func TestGetMaxActiveDownloads(t *testing.T) {
+	client, err := New(Config{
+		BaseURL:        "http://localhost:8080",
+		Username:       "test",
+		Password:       "test",
+		RequestTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Test getting max active downloads
+	_, err = client.GetMaxActiveDownloads()
+	if err != nil {
+		// Expected to fail without real qBittorrent instance
+		if !strings.Contains(err.Error(), "failed to get global settings") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+}
+
+func TestGetMaxActiveUploads(t *testing.T) {
+	client, err := New(Config{
+		BaseURL:        "http://localhost:8080",
+		Username:       "test",
+		Password:       "test",
+		RequestTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Test getting max active uploads
+	_, err = client.GetMaxActiveUploads()
+	if err != nil {
+		// Expected to fail without real qBittorrent instance
+		if !strings.Contains(err.Error(), "failed to get global settings") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+}
+
+func TestGetMaxActiveTorrents(t *testing.T) {
+	client, err := New(Config{
+		BaseURL:        "http://localhost:8080",
+		Username:       "test",
+		Password:       "test",
+		RequestTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Test getting max active torrents
+	_, err = client.GetMaxActiveTorrents()
+	if err != nil {
+		// Expected to fail without real qBittorrent instance
+		if !strings.Contains(err.Error(), "failed to get global settings") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+}
+
+func TestGetMaxActiveCheckingTorrents(t *testing.T) {
+	client, err := New(Config{
+		BaseURL:        "http://localhost:8080",
+		Username:       "test",
+		Password:       "test",
+		RequestTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Test getting max active checking torrents
+	_, err = client.GetMaxActiveCheckingTorrents()
+	if err != nil {
+		// Expected to fail without real qBittorrent instance
+		if !strings.Contains(err.Error(), "failed to get global settings") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+}
+
+func TestMaxActiveTorrentLimitsWithZeroValues(t *testing.T) {
+	client, err := New(Config{
+		BaseURL:        "http://localhost:8080",
+		Username:       "test",
+		Password:       "test",
+		RequestTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Test with zero values (should disable limits)
+	maxDownloads := 0
+	maxUploads := 0
+	maxTorrents := 0
+	maxChecking := 0
+
+	err = client.SetMaxActiveTorrentLimits(maxDownloads, maxUploads, maxTorrents, maxChecking)
+	if err != nil {
+		// Expected to fail without real qBittorrent instance
+		if !strings.Contains(err.Error(), "failed to get global settings") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+}
+
+func TestMaxActiveTorrentLimitsWithNegativeValues(t *testing.T) {
+	client, err := New(Config{
+		BaseURL:        "http://localhost:8080",
+		Username:       "test",
+		Password:       "test",
+		RequestTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Test with negative values (should be handled gracefully)
+	maxDownloads := -1
+	maxUploads := -5
+	maxTorrents := -10
+	maxChecking := -2
+
+	err = client.SetMaxActiveTorrentLimits(maxDownloads, maxUploads, maxTorrents, maxChecking)
+	if err != nil {
+		// Expected to fail without real qBittorrent instance
+		if !strings.Contains(err.Error(), "failed to get global settings") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+}

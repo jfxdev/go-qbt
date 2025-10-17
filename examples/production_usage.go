@@ -63,3 +63,4 @@ func main() {
 	fmt.Println("   No debug logs were shown because Debug: false")
 	fmt.Println("   Session management happened transparently in the background")
 }
+

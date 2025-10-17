@@ -265,6 +265,7 @@ type GlobalSettings struct {
 	MaxActiveDownloads                 int               `json:"max_active_downloads"`                   // Max active downloads
 	MaxActiveUploads                   int               `json:"max_active_uploads"`                     // Max active uploads
 	MaxActiveTorrents                  int               `json:"max_active_torrents"`                    // Max active torrents
+	MaxActiveCheckingTorrents          int               `json:"max_active_checking_torrents"`           // Max active checking torrents
 	DontCountSlowTorrents              bool              `json:"dont_count_slow_torrents"`               // Don't count slow torrents
 	SlowTorrentsDownloadRate           int               `json:"slow_torrents_dl_rate_threshold"`        // Slow torrents DL rate
 	SlowTorrentsUploadRate             int               `json:"slow_torrents_ul_rate_threshold"`        // Slow torrents UL rate
