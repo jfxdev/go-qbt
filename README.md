@@ -134,6 +134,17 @@ if err != nil {
 - `SetUploadSpeedLimit(limit int)` - Set global upload speed limit
 - `ToggleSpeedLimits()` - Toggle speed limits mode
 
+### Maximum Active Torrent Management
+- `SetMaxActiveDownloads(maxDownloads int)` - Set maximum number of active downloads
+- `SetMaxActiveUploads(maxUploads int)` - Set maximum number of active uploads
+- `SetMaxActiveTorrents(maxTorrents int)` - Set maximum number of active torrents
+- `SetMaxActiveCheckingTorrents(maxChecking int)` - Set maximum number of active checking torrents
+- `SetMaxActiveTorrentLimits(maxDownloads, maxUploads, maxTorrents, maxChecking int)` - Set all maximum active torrent limits at once
+- `GetMaxActiveDownloads()` - Get current maximum number of active downloads
+- `GetMaxActiveUploads()` - Get current maximum number of active uploads
+- `GetMaxActiveTorrents()` - Get current maximum number of active torrents
+- `GetMaxActiveCheckingTorrents()` - Get current maximum number of active checking torrents
+
 ### System Information & Monitoring
 - `GetMainData()` - Get main server data and sync information
 - `GetTransferInfo()` - Get transfer statistics and information
@@ -248,6 +259,65 @@ Cookies expired, cleared from cache
 - **Response times**: Per operation
 
 ## 🧪 Examples
+
+### Maximum Active Torrent Management Example
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    "time"
+    
+    "github.com/jfxdev/go-qbt"
+)
+
+func main() {
+    config := qbt.Config{
+        BaseURL:        "http://localhost:8080",
+        Username:       "admin",
+        Password:       "password",
+        RequestTimeout: 30 * time.Second,
+        MaxRetries:     3,
+        RetryBackoff:   2 * time.Second,
+        Debug:          false,
+    }
+    
+    client, err := qbt.New(config)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer client.Close()
+    
+    // Get current maximum active torrent limits
+    maxDownloads, _ := client.GetMaxActiveDownloads()
+    maxUploads, _ := client.GetMaxActiveUploads()
+    maxTorrents, _ := client.GetMaxActiveTorrents()
+    maxChecking, _ := client.GetMaxActiveCheckingTorrents()
+    
+    fmt.Printf("Current limits - Downloads: %d, Uploads: %d, Torrents: %d, Checking: %d\n",
+        maxDownloads, maxUploads, maxTorrents, maxChecking)
+    
+    // Set individual limits
+    err = client.SetMaxActiveDownloads(5)
+    if err != nil {
+        log.Printf("Error setting max downloads: %v", err)
+    }
+    
+    err = client.SetMaxActiveUploads(3)
+    if err != nil {
+        log.Printf("Error setting max uploads: %v", err)
+    }
+    
+    // Set all limits at once
+    err = client.SetMaxActiveTorrentLimits(8, 4, 15, 2)
+    if err != nil {
+        log.Printf("Error setting all limits: %v", err)
+    } else {
+        fmt.Println("Successfully set all maximum active torrent limits")
+    }
+}
+```
 
 ### Complete Usage Example
 ```go

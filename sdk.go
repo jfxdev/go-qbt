@@ -899,6 +899,42 @@ func (qb *Client) ToggleSpeedLimits() error {
 	return nil
 }
 
+// SetGlobalRateLimits sets global download and upload speed limits
+func (qb *Client) SetGlobalRateLimits(downloadLimit, uploadLimit int) error {
+	// Get current global settings
+	settings, err := qb.GetGlobalSettings()
+	if err != nil {
+		return fmt.Errorf("failed to get global settings: %w", err)
+	}
+
+	// Update the rate limits
+	settings.GlobalDLSpeedLimit = downloadLimit
+	settings.GlobalUPSpeedLimit = uploadLimit
+	settings.GlobalDLSpeedLimitEnabled = downloadLimit > 0
+	settings.GlobalUPSpeedLimitEnabled = uploadLimit > 0
+
+	// Apply the updated settings
+	return qb.SetGlobalSettings(*settings)
+}
+
+// SetAlternativeRateLimits sets alternative global download and upload speed limits
+func (qb *Client) SetAlternativeRateLimits(downloadLimit, uploadLimit int) error {
+	// Get current global settings
+	settings, err := qb.GetGlobalSettings()
+	if err != nil {
+		return fmt.Errorf("failed to get global settings: %w", err)
+	}
+
+	// Update the alternative rate limits
+	settings.AltGlobalSpeedLimit = downloadLimit
+	settings.AlternativeGlobalSpeedLimit = uploadLimit
+	settings.AltGlobalSpeedLimitEnabled = downloadLimit > 0
+	settings.AlternativeGlobalSpeedLimitEnabled = uploadLimit > 0
+
+	// Apply the updated settings
+	return qb.SetGlobalSettings(*settings)
+}
+
 // SetTorrentDownloadLimit sets download speed limit for a specific torrent
 func (qb *Client) SetTorrentDownloadLimit(hash string, limit int) error {
 	data := url.Values{
@@ -1061,4 +1097,201 @@ func (qb *Client) RemoveRSSFeed(path string) error {
 	}
 
 	return nil
+}
+
+// SetTorrentLocation sets the location for torrent files
+func (qb *Client) SetTorrentLocation(hash string, location string) error {
+	data := url.Values{
+		"hashes":   {hash},
+		"location": {location},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/setLocation", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to set torrent location: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to set torrent location. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
+// RenameTorrent renames a torrent
+func (qb *Client) RenameTorrent(hash string, newName string) error {
+	data := url.Values{
+		"hash": {hash},
+		"name": {newName},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/rename", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to rename torrent: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to rename torrent. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
+// SuperSeedingMode enables or disables super seeding for a torrent
+func (qb *Client) SuperSeedingMode(hash string, enabled bool) error {
+	data := url.Values{
+		"hashes": {hash},
+		"value":  {fmt.Sprintf("%v", enabled)},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/setSuperSeeding", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to set super seeding mode: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to set super seeding mode. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
+// ===== MAXIMUM ACTIVE TORRENT MANAGEMENT =====
+
+// SetMaxActiveDownloads sets the maximum number of active downloads
+func (qb *Client) SetMaxActiveDownloads(maxDownloads int) error {
+	// Get current global settings
+	settings, err := qb.GetGlobalSettings()
+	if err != nil {
+		return fmt.Errorf("failed to get global settings: %w", err)
+	}
+
+	// Update the max active downloads
+	settings.MaxActiveDownloads = maxDownloads
+
+	// Apply the updated settings
+	return qb.SetGlobalSettings(*settings)
+}
+
+// SetMaxActiveUploads sets the maximum number of active uploads
+func (qb *Client) SetMaxActiveUploads(maxUploads int) error {
+	// Get current global settings
+	settings, err := qb.GetGlobalSettings()
+	if err != nil {
+		return fmt.Errorf("failed to get global settings: %w", err)
+	}
+
+	// Update the max active uploads
+	settings.MaxActiveUploads = maxUploads
+
+	// Apply the updated settings
+	return qb.SetGlobalSettings(*settings)
+}
+
+// SetMaxActiveTorrents sets the maximum number of active torrents
+func (qb *Client) SetMaxActiveTorrents(maxTorrents int) error {
+	// Get current global settings
+	settings, err := qb.GetGlobalSettings()
+	if err != nil {
+		return fmt.Errorf("failed to get global settings: %w", err)
+	}
+
+	// Update the max active torrents
+	settings.MaxActiveTorrents = maxTorrents
+
+	// Apply the updated settings
+	return qb.SetGlobalSettings(*settings)
+}
+
+// SetMaxActiveCheckingTorrents sets the maximum number of active checking torrents
+func (qb *Client) SetMaxActiveCheckingTorrents(maxChecking int) error {
+	// Get current global settings
+	settings, err := qb.GetGlobalSettings()
+	if err != nil {
+		return fmt.Errorf("failed to get global settings: %w", err)
+	}
+
+	// Update the max active checking torrents
+	settings.MaxActiveCheckingTorrents = maxChecking
+
+	// Apply the updated settings
+	return qb.SetGlobalSettings(*settings)
+}
+
+// SetMaxActiveTorrentLimits sets all maximum active torrent limits at once
+func (qb *Client) SetMaxActiveTorrentLimits(maxDownloads, maxUploads, maxTorrents, maxChecking int) error {
+	// Get current global settings
+	settings, err := qb.GetGlobalSettings()
+	if err != nil {
+		return fmt.Errorf("failed to get global settings: %w", err)
+	}
+
+	// Update all the max active limits
+	settings.MaxActiveDownloads = maxDownloads
+	settings.MaxActiveUploads = maxUploads
+	settings.MaxActiveTorrents = maxTorrents
+	settings.MaxActiveCheckingTorrents = maxChecking
+
+	// Apply the updated settings
+	return qb.SetGlobalSettings(*settings)
+}
+
+// GetMaxActiveDownloads gets the current maximum number of active downloads
+func (qb *Client) GetMaxActiveDownloads() (int, error) {
+	settings, err := qb.GetGlobalSettings()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get global settings: %w", err)
+	}
+	return settings.MaxActiveDownloads, nil
+}
+
+// GetMaxActiveUploads gets the current maximum number of active uploads
+func (qb *Client) GetMaxActiveUploads() (int, error) {
+	settings, err := qb.GetGlobalSettings()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get global settings: %w", err)
+	}
+	return settings.MaxActiveUploads, nil
+}
+
+// GetMaxActiveTorrents gets the current maximum number of active torrents
+func (qb *Client) GetMaxActiveTorrents() (int, error) {
+	settings, err := qb.GetGlobalSettings()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get global settings: %w", err)
+	}
+	return settings.MaxActiveTorrents, nil
+}
+
+// GetMaxActiveCheckingTorrents gets the current maximum number of active checking torrents
+func (qb *Client) GetMaxActiveCheckingTorrents() (int, error) {
+	settings, err := qb.GetGlobalSettings()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get global settings: %w", err)
+	}
+	return settings.MaxActiveCheckingTorrents, nil
 }
