@@ -235,118 +235,29 @@ type TorrentPeer struct {
 
 // GlobalSettings represents qBittorrent global settings
 type GlobalSettings struct {
-	Locale                             string            `json:"locale"`                                 // Interface language
-	CreateSubfolderEnabled             bool              `json:"create_subfolder_enabled"`               // Create subfolder
-	StartPausedEnabled                 bool              `json:"start_paused_enabled"`                   // Start paused
-	AutoDeleteMode                     int               `json:"auto_delete_mode"`                       // Auto delete mode
-	PreallocateAll                     bool              `json:"preallocate_all"`                        // Preallocate all
-	IncompleteFilesExt                 bool              `json:"incomplete_files_ext"`                   // Incomplete files extension
-	AutoTMMEnabled                     bool              `json:"auto_tmm_enabled"`                       // Automatic torrent management
-	TorrentChangedTMMEnabled           bool              `json:"torrent_changed_tmm_enabled"`            // Torrent changed TMM
-	SavePathChangedTMMEnabled          bool              `json:"save_path_changed_tmm_enabled"`          // Save path changed TMM
-	CategoryChangedTMMEnabled          bool              `json:"category_changed_tmm_enabled"`           // Category changed TMM
-	SavePath                           string            `json:"save_path"`                              // Default save path
-	TempPathEnabled                    bool              `json:"temp_path_enabled"`                      // Use temp path
-	TempPath                           string            `json:"temp_path"`                              // Temp path
-	ExportDir                          string            `json:"export_dir"`                             // Export directory
-	ExportDirFin                       string            `json:"export_dir_fin"`                         // Export directory finished
-	ScanDirs                           map[string]string `json:"scan_dirs"`                              // Scan directories
-	MailNotificationEnabled            bool              `json:"mail_notification_enabled"`              // Mail notification
-	MailNotificationSender             string            `json:"mail_notification_sender"`               // Mail sender
-	MailNotificationEmail              string            `json:"mail_notification_email"`                // Mail email
-	MailNotificationSMTP               string            `json:"mail_notification_smtp"`                 // Mail SMTP
-	MailNotificationSSLEnabled         bool              `json:"mail_notification_ssl_enabled"`          // Mail SSL
-	MailNotificationAuthEnabled        bool              `json:"mail_notification_auth_enabled"`         // Mail auth
-	MailNotificationUsername           string            `json:"mail_notification_username"`             // Mail username
-	MailNotificationPassword           string            `json:"mail_notification_password"`             // Mail password
-	AutorunEnabled                     bool              `json:"autorun_enabled"`                        // Autorun enabled
-	AutorunProgram                     string            `json:"autorun_program"`                        // Autorun program
-	QueueingEnabled                    bool              `json:"queueing_enabled"`                       // Queueing enabled
-	MaxActiveDownloads                 int               `json:"max_active_downloads"`                   // Max active downloads
-	MaxActiveUploads                   int               `json:"max_active_uploads"`                     // Max active uploads
-	MaxActiveTorrents                  int               `json:"max_active_torrents"`                    // Max active torrents
-	MaxActiveCheckingTorrents          int               `json:"max_active_checking_torrents"`           // Max active checking torrents
-	DontCountSlowTorrents              bool              `json:"dont_count_slow_torrents"`               // Don't count slow torrents
-	SlowTorrentsDownloadRate           int               `json:"slow_torrents_dl_rate_threshold"`        // Slow torrents DL rate
-	SlowTorrentsUploadRate             int               `json:"slow_torrents_ul_rate_threshold"`        // Slow torrents UL rate
-	SlowTorrentsInactivityTimer        int               `json:"slow_torrents_inactivity_timer"`         // Slow torrents inactivity timer
-	MaxRatioEnabled                    bool              `json:"max_ratio_enabled"`                      // Max ratio enabled
-	MaxRatio                           float64           `json:"max_ratio"`                              // Max ratio
-	MaxRatioAct                        int               `json:"max_ratio_act"`                          // Max ratio action
-	ListenPort                         int               `json:"listen_port"`                            // Listen port
-	UPnP                               bool              `json:"upnp"`                                   // UPnP
-	RandomPort                         bool              `json:"random_port"`                            // Random port
-	DownloadPath                       string            `json:"download_path"`                          // Download path
-	UseSubcategories                   bool              `json:"use_subcategories"`                      // Use subcategories
-	SaveResumeDataInterval             int               `json:"save_resume_data_interval"`              // Save resume data interval
-	RecheckCompletedTorrents           bool              `json:"recheck_completed_torrents"`             // Recheck completed torrents
-	ResumeDataStorageType              int               `json:"resume_data_storage_type"`               // Resume data storage type
-	TorrentExportDirectory             string            `json:"torrent_export_dir"`                     // Torrent export directory
-	TorrentExportDirectoryFin          string            `json:"torrent_export_dir_fin"`                 // Torrent export directory finished
-	SendBufferWatermark                int               `json:"send_buffer_watermark"`                  // Send buffer watermark
-	SendBufferLowWatermark             int               `json:"send_buffer_low_watermark"`              // Send buffer low watermark
-	SendBufferWatermarkFactor          int               `json:"send_buffer_watermark_factor"`           // Send buffer watermark factor
-	SocketBacklogSize                  int               `json:"socket_backlog_size"`                    // Socket backlog size
-	OutgoingPortsMin                   int               `json:"outgoing_ports_min"`                     // Outgoing ports min
-	OutgoingPortsMax                   int               `json:"outgoing_ports_max"`                     // Outgoing ports max
-	UPnPLeaseDuration                  int               `json:"upnp_lease_duration"`                    // UPnP lease duration
-	PeerTOS                            int               `json:"peer_tos"`                               // Peer TOS
-	UTPRateLimitEnabled                bool              `json:"utp_rate_limit_enabled"`                 // UTP rate limit enabled
-	UTPRateLimit                       int               `json:"utp_rate_limit"`                         // UTP rate limit
-	AlternativeGlobalSpeedLimit        int               `json:"alternative_global_speed_limit"`         // Alternative global speed limit
-	AlternativeGlobalSpeedLimitEnabled bool              `json:"alternative_global_speed_limit_enabled"` // Alternative global speed limit enabled
-	GlobalSpeedLimit                   int               `json:"global_speed_limit"`                     // Global speed limit
-	GlobalSpeedLimitEnabled            bool              `json:"global_speed_limit_enabled"`             // Global speed limit enabled
-	BittorrentProtocol                 int               `json:"bittorrent_protocol"`                    // BitTorrent protocol
-	LimitUTPRate                       bool              `json:"limit_utp_rate"`                         // Limit UTP rate
-	LimitTCPOverhead                   bool              `json:"limit_tcp_overhead"`                     // Limit TCP overhead
-	LimitLANPeers                      bool              `json:"limit_lan_peers"`                        // Limit LAN peers
-	AltGlobalSpeedLimit                int               `json:"alt_global_speed_limit"`                 // Alt global speed limit
-	AltGlobalSpeedLimitEnabled         bool              `json:"alt_global_speed_limit_enabled"`         // Alt global speed limit enabled
-	GlobalDLSpeedLimit                 int               `json:"global_dl_speed_limit"`                  // Global download speed limit
-	GlobalDLSpeedLimitEnabled          bool              `json:"global_dl_speed_limit_enabled"`          // Global download speed limit enabled
-	GlobalUPSpeedLimit                 int               `json:"global_up_speed_limit"`                  // Global upload speed limit
-	GlobalUPSpeedLimitEnabled          bool              `json:"global_up_speed_limit_enabled"`          // Global upload speed limit enabled
-	BypassLocalAuth                    bool              `json:"bypass_local_auth"`                      // Bypass local auth
-	BypassAuthSubnetWhitelistEnabled   bool              `json:"bypass_auth_subnet_whitelist_enabled"`   // Bypass auth subnet whitelist enabled
-	BypassAuthSubnetWhitelist          string            `json:"bypass_auth_subnet_whitelist"`           // Bypass auth subnet whitelist
-	WebUIAddress                       string            `json:"web_ui_address"`                         // Web UI address
-	WebUIPort                          int               `json:"web_ui_port"`                            // Web UI port
-	WebUIUPnP                          bool              `json:"web_ui_upnp"`                            // Web UI UPnP
-	WebUIUsername                      string            `json:"web_ui_username"`                        // Web UI username
-	WebUIPassword                      string            `json:"web_ui_password"`                        // Web UI password
-	WebUICSRFProtectionEnabled         bool              `json:"web_ui_csrf_protection_enabled"`         // Web UI CSRF protection
-	WebUIClickjackingProtectionEnabled bool              `json:"web_ui_clickjacking_protection_enabled"` // Web UI clickjacking protection
-	WebUISecureCookieEnabled           bool              `json:"web_ui_secure_cookie_enabled"`           // Web UI secure cookie
-	WebUIMaxAuthFailCount              int               `json:"web_ui_max_auth_fail_count"`             // Web UI max auth fail count
-	WebUIBanDuration                   int               `json:"web_ui_ban_duration"`                    // Web UI ban duration
-	WebUISessionTimeout                int               `json:"web_ui_session_timeout"`                 // Web UI session timeout
-	WebUIHostHeaderValidationEnabled   bool              `json:"web_ui_host_header_validation_enabled"`  // Web UI host header validation
-	WebUIHTTPSEnabled                  bool              `json:"web_ui_https_enabled"`                   // Web UI HTTPS enabled
-	WebUIHTTPSKeyPath                  string            `json:"web_ui_https_key_path"`                  // Web UI HTTPS key path
-	WebUIHTTPSCertPath                 string            `json:"web_ui_https_cert_path"`                 // Web UI HTTPS cert path
-	DyDNSEnabled                       bool              `json:"dydns_enabled"`                          // Dynamic DNS enabled
-	DyDNSService                       int               `json:"dydns_service"`                          // Dynamic DNS service
-	DyDNSUsername                      string            `json:"dydns_username"`                         // Dynamic DNS username
-	DyDNSPassword                      string            `json:"dydns_password"`                         // Dynamic DNS password
-	DyDNSDomain                        string            `json:"dydns_domain"`                           // Dynamic DNS domain
-	RSSRefreshInterval                 int               `json:"rss_refresh_interval"`                   // RSS refresh interval
-	RSSMaxArticlesPerFeed              int               `json:"rss_max_articles_per_feed"`              // RSS max articles per feed
-	RSSProcessingEnabled               bool              `json:"rss_processing_enabled"`                 // RSS processing enabled
-	RSSAutoDownloadingEnabled          bool              `json:"rss_auto_downloading_enabled"`           // RSS auto downloading enabled
-	RSSDownloadRepackProperEpisodes    bool              `json:"rss_download_repack_proper_episodes"`    // RSS download repack proper episodes
-	RSSSmartEpisodeFilter              bool              `json:"rss_smart_episode_filter"`               // RSS smart episode filter
-	I2PEnabled                         bool              `json:"i2p_enabled"`                            // I2P enabled
-	I2PAddress                         string            `json:"i2p_address"`                            // I2P address
-	I2PPort                            int               `json:"i2p_port"`                               // I2P port
-	I2PInboundLength                   int               `json:"i2p_inbound_length"`                     // I2P inbound length
-	I2POutboundLength                  int               `json:"i2p_outbound_length"`                    // I2P outbound length
-	I2PInboundQuantity                 int               `json:"i2p_inbound_quantity"`                   // I2P inbound quantity
-	I2POutboundQuantity                int               `json:"i2p_outbound_quantity"`                  // I2P outbound quantity
-	I2PInboundVariance                 int               `json:"i2p_inbound_variance"`                   // I2P inbound variance
-	I2POutboundVariance                int               `json:"i2p_outbound_variance"`                  // I2P outbound variance
-	I2PInboundLengthVariance           int               `json:"i2p_inbound_length_variance"`            // I2P inbound length variance
-	I2POutboundLengthVariance          int               `json:"i2p_outbound_length_variance"`           // I2P outbound length variance
+	Locale                             string  `json:"locale"`                                 // Interface language
+	CreateSubfolderEnabled             bool    `json:"create_subfolder_enabled"`               // Create subfolder
+	StartPausedEnabled                 bool    `json:"start_paused_enabled"`                   // Start paused
+	AutoDeleteMode                     int     `json:"auto_delete_mode"`                       // Auto delete mode
+	SavePath                           string  `json:"save_path"`                              // Default save path
+	MaxRatioEnabled                    bool    `json:"max_ratio_enabled"`                      // Max ratio enabled
+	MaxRatio                           float64 `json:"max_ratio"`                              // Max ratio
+	MaxRatioAct                        int     `json:"max_ratio_act"`                          // Max ratio action
+	ListenPort                         int     `json:"listen_port"`                            // Listen port
+	MaxActiveTorrents                  int     `json:"max_active_torrents"`                    // Max active torrents
+	MaxActiveCheckingTorrents          int     `json:"max_active_checking_torrents"`           // Max active checking torrents
+	MaxActiveDownloads                 int     `json:"max_active_downloads"`                   // Max active downloads
+	MaxActiveUploads                   int     `json:"max_active_uploads"`                     // Max active uploads
+	AlternativeGlobalSpeedLimit        int     `json:"alternative_global_speed_limit"`         // Alternative global speed limit
+	AlternativeGlobalSpeedLimitEnabled bool    `json:"alternative_global_speed_limit_enabled"` // Alternative global speed limit enabled
+	GlobalSpeedLimit                   int     `json:"global_speed_limit"`                     // Global speed limit
+	GlobalSpeedLimitEnabled            bool    `json:"global_speed_limit_enabled"`             // Global speed limit enabled
+	AltGlobalSpeedLimit                int     `json:"alt_global_speed_limit"`                 // Alt global speed limit
+	AltGlobalSpeedLimitEnabled         bool    `json:"alt_global_speed_limit_enabled"`         // Alt global speed limit enabled
+	GlobalDLSpeedLimit                 int     `json:"global_dl_speed_limit"`                  // Global download speed limit
+	GlobalDLSpeedLimitEnabled          bool    `json:"global_dl_speed_limit_enabled"`          // Global download speed limit enabled
+	GlobalUPSpeedLimit                 int     `json:"global_up_speed_limit"`                  // Global upload speed limit
+	GlobalUPSpeedLimitEnabled          bool    `json:"global_up_speed_limit_enabled"`          // Global upload speed limit enabled
 }
 
 // Category represents a torrent category

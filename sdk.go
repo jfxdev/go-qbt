@@ -146,12 +146,12 @@ func (qb *Client) updateTorrentStatus(action, hash string, optional map[string]s
 	return nil
 }
 
-func (qb *Client) PauseTorrents(hash string) error {
-	return qb.updateTorrentStatus("pause", hash, nil)
+func (qb *Client) StartTorrents(hash string) error {
+	return qb.updateTorrentStatus("start", hash, nil)
 }
 
-func (qb *Client) ResumeTorrents(hash string) error {
-	return qb.updateTorrentStatus("resume", hash, nil)
+func (qb *Client) StopTorrents(hash string) error {
+	return qb.updateTorrentStatus("stop", hash, nil)
 }
 
 func (qb *Client) DeleteTorrents(hash string, deleteFiles bool) error {
