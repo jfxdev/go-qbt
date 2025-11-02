@@ -73,35 +73,40 @@ type TorrentConfig struct {
 
 // TorrentResponse is a subset of torrent info returned by qBittorrent.
 type TorrentResponse struct {
-	AddedOn       int         `json:"added_on"`
-	Category      string      `json:"category"`
-	CompletionOn  int64       `json:"completion_on"`
-	Dlspeed       int         `json:"dlspeed"`
-	Downloaded    int         `json:"downloaded"`
-	Eta           int         `json:"eta"`
-	ForceStart    bool        `json:"force_start"`
-	Hash          string      `json:"hash"`
-	InfoHashV1    string      `json:"infohash_v1"`
-	InfoHashV2    string      `json:"infohash_v2"`
-	MagnetURI     string      `json:"magnet_uri"`
-	MagnetLink    *MagnetLink `json:"magnet_link"`
-	Name          string      `json:"name"`
-	NumComplete   int         `json:"num_complete"`
-	NumIncomplete int         `json:"num_incomplete"`
-	NumLeechs     int         `json:"num_leechs"`
-	NumSeeds      int         `json:"num_seeds"`
-	Popularity    float64     `json:"popularity"`
-	Priority      int         `json:"priority"`
-	Progress      float64     `json:"progress"`
-	Ratio         float64     `json:"ratio"`
-	SavePath      string      `json:"save_path"`
-	SeqDl         bool        `json:"seq_dl"`
-	Size          int         `json:"size"`
-	State         string      `json:"state"`
-	SuperSeeding  bool        `json:"super_seeding"`
-	Upspeed       int         `json:"upspeed"`
-	Uploaded      int         `json:"uploaded"`
-	Tags          string      `json:"tags"`
+	AddedOn                  int         `json:"added_on"`
+	Category                 string      `json:"category"`
+	CompletionOn             int64       `json:"completion_on"`
+	Dlspeed                  int         `json:"dlspeed"`
+	Downloaded               int         `json:"downloaded"`
+	Eta                      int         `json:"eta"`
+	ForceStart               bool        `json:"force_start"`
+	Hash                     string      `json:"hash"`
+	InfoHashV1               string      `json:"infohash_v1"`
+	InfoHashV2               string      `json:"infohash_v2"`
+	MagnetURI                string      `json:"magnet_uri"`
+	MagnetLink               *MagnetLink `json:"magnet_link"`
+	Name                     string      `json:"name"`
+	NumComplete              int         `json:"num_complete"`
+	NumIncomplete            int         `json:"num_incomplete"`
+	NumLeechs                int         `json:"num_leechs"`
+	NumSeeds                 int         `json:"num_seeds"`
+	Popularity               float64     `json:"popularity"`
+	Priority                 int         `json:"priority"`
+	Progress                 float64     `json:"progress"`
+	Ratio                    float64     `json:"ratio"`
+	SavePath                 string      `json:"save_path"`
+	SeqDl                    bool        `json:"seq_dl"`
+	Size                     int         `json:"size"`
+	State                    string      `json:"state"`
+	SuperSeeding             bool        `json:"super_seeding"`
+	Upspeed                  int         `json:"upspeed"`
+	Uploaded                 int         `json:"uploaded"`
+	Tags                     string      `json:"tags"`
+	RatioLimit               float64     `json:"ratio_limit"`                 // Ratio limit (-2 = use global, -1 = no limit)
+	MaxRatio                 float64     `json:"max_ratio"`                   // Max ratio (alternative field name)
+	SeedingTimeLimit         int         `json:"seeding_time_limit"`          // Seeding time limit in minutes
+	MaxSeedingTime           int         `json:"max_seeding_time"`            // Max seeding time (alternative field name)
+	InactiveSeedingTimeLimit int         `json:"inactive_seeding_time_limit"` // Inactive seeding time limit in minutes
 }
 
 // MainDataResponse represents a subset of sync/maindata response.
@@ -167,37 +172,42 @@ type TorrentFile struct {
 
 // TorrentProperties represents detailed properties of a torrent
 type TorrentProperties struct {
-	SavePath           string  `json:"save_path"`            // Save path
-	CreationDate       int64   `json:"creation_date"`        // Creation date
-	PieceSize          int64   `json:"piece_size"`           // Piece size
-	Comment            string  `json:"comment"`              // Comment
-	TotalWasted        int64   `json:"total_wasted"`         // Total wasted
-	TotalUploaded      int64   `json:"total_uploaded"`       // Total uploaded
-	TotalDownloaded    int64   `json:"total_downloaded"`     // Total downloaded
-	UpLimit            int     `json:"up_limit"`             // Upload limit
-	DlLimit            int     `json:"dl_limit"`             // Download limit
-	TimeElapsed        int     `json:"time_elapsed"`         // Time elapsed
-	SeedingTime        int     `json:"seeding_time"`         // Seeding time
-	NbConnections      int     `json:"nb_connections"`       // Number of connections
-	NbConnectionsLimit int     `json:"nb_connections_limit"` // Number of connections limit
-	ShareRatio         float64 `json:"share_ratio"`          // Share ratio
-	AdditionDate       int64   `json:"addition_date"`        // Addition date
-	CompletionDate     int64   `json:"completion_date"`      // Completion date
-	CreatedBy          string  `json:"created_by"`           // Created by
-	DlSpeedAvg         int     `json:"dl_speed_avg"`         // Download speed average
-	DlSpeed            int     `json:"dl_speed"`             // Download speed
-	Eta                int     `json:"eta"`                  // ETA
-	LastSeen           int     `json:"last_seen"`            // Last seen
-	Peers              int     `json:"peers"`                // Peers
-	PeersTotal         int     `json:"peers_total"`          // Total peers
-	PiecesHave         int     `json:"pieces_have"`          // Pieces have
-	PiecesNum          int     `json:"pieces_num"`           // Total pieces
-	Reannounce         int     `json:"reannounce"`           // Reannounce
-	Seeds              int     `json:"seeds"`                // Seeds
-	SeedsTotal         int     `json:"seeds_total"`          // Total seeds
-	ShareLimit         int     `json:"share_limit"`          // Share limit
-	UpSpeedAvg         int     `json:"up_speed_avg"`         // Upload speed average
-	UpSpeed            int     `json:"up_speed"`             // Upload speed
+	SavePath                 string  `json:"save_path"`                   // Save path
+	CreationDate             int64   `json:"creation_date"`               // Creation date
+	PieceSize                int64   `json:"piece_size"`                  // Piece size
+	Comment                  string  `json:"comment"`                     // Comment
+	TotalWasted              int64   `json:"total_wasted"`                // Total wasted
+	TotalUploaded            int64   `json:"total_uploaded"`              // Total uploaded
+	TotalDownloaded          int64   `json:"total_downloaded"`            // Total downloaded
+	UpLimit                  int     `json:"up_limit"`                    // Upload limit
+	DlLimit                  int     `json:"dl_limit"`                    // Download limit
+	TimeElapsed              int     `json:"time_elapsed"`                // Time elapsed
+	SeedingTime              int     `json:"seeding_time"`                // Seeding time
+	NbConnections            int     `json:"nb_connections"`              // Number of connections
+	NbConnectionsLimit       int     `json:"nb_connections_limit"`        // Number of connections limit
+	ShareRatio               float64 `json:"share_ratio"`                 // Share ratio
+	AdditionDate             int64   `json:"addition_date"`               // Addition date
+	CompletionDate           int64   `json:"completion_date"`             // Completion date
+	CreatedBy                string  `json:"created_by"`                  // Created by
+	DlSpeedAvg               int     `json:"dl_speed_avg"`                // Download speed average
+	DlSpeed                  int     `json:"dl_speed"`                    // Download speed
+	Eta                      int     `json:"eta"`                         // ETA
+	LastSeen                 int     `json:"last_seen"`                   // Last seen
+	Peers                    int     `json:"peers"`                       // Peers
+	PeersTotal               int     `json:"peers_total"`                 // Total peers
+	PiecesHave               int     `json:"pieces_have"`                 // Pieces have
+	PiecesNum                int     `json:"pieces_num"`                  // Total pieces
+	Reannounce               int     `json:"reannounce"`                  // Reannounce
+	Seeds                    int     `json:"seeds"`                       // Seeds
+	SeedsTotal               int     `json:"seeds_total"`                 // Total seeds
+	ShareLimit               int     `json:"share_limit"`                 // Share limit (deprecated, use specific limits below)
+	RatioLimit               float64 `json:"ratio_limit"`                 // Ratio limit (-2 = use global, -1 = no limit)
+	MaxRatio                 float64 `json:"max_ratio"`                   // Max ratio (alternative field name, same as ratio_limit)
+	SeedingTimeLimit         int     `json:"seeding_time_limit"`          // Seeding time limit in minutes (-2 = use global, -1 = no limit)
+	MaxSeedingTime           int     `json:"max_seeding_time"`            // Max seeding time (alternative field name, same as seeding_time_limit)
+	InactiveSeedingTimeLimit int     `json:"inactive_seeding_time_limit"` // Inactive seeding time limit in minutes (-2 = use global, -1 = no limit)
+	UpSpeedAvg               int     `json:"up_speed_avg"`                // Upload speed average
+	UpSpeed                  int     `json:"up_speed"`                    // Upload speed
 }
 
 // ===== STRUCTURES FOR SEEDBOX FUNCTIONALITIES =====

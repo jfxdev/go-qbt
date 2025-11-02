@@ -422,6 +422,16 @@ func (qb *Client) GetTorrentProperties(hash string) (*TorrentProperties, error) 
 		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
 
+	// Normalize fields: some API versions use different field names
+	// Use max_ratio if ratio_limit is 0
+	if properties.RatioLimit == 0 && properties.MaxRatio != 0 {
+		properties.RatioLimit = properties.MaxRatio
+	}
+	// Use max_seeding_time if seeding_time_limit is 0
+	if properties.SeedingTimeLimit == 0 && properties.MaxSeedingTime != 0 {
+		properties.SeedingTimeLimit = properties.MaxSeedingTime
+	}
+
 	return &properties, nil
 }
 
@@ -855,6 +865,33 @@ func (qb *Client) SetDownloadSpeedLimit(limit int) error {
 	return nil
 }
 
+// GetGlobalDownloadLimit gets the global download speed limit
+func (qb *Client) GetGlobalDownloadLimit() (int, error) {
+	endpoint := fmt.Sprintf("%s/api/v2/transfer/downloadLimit", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodGet, endpoint, nil, nil)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get global download limit: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("failed to get global download limit. Status: %d, Response: %s", resp.StatusCode, string(body))
+	}
+
+	var limit int
+	if err := json.Unmarshal(body, &limit); err != nil {
+		return 0, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return limit, nil
+}
+
 // SetUploadSpeedLimit sets the upload speed limit
 func (qb *Client) SetUploadSpeedLimit(limit int) error {
 	data := url.Values{
@@ -879,6 +916,33 @@ func (qb *Client) SetUploadSpeedLimit(limit int) error {
 	}
 
 	return nil
+}
+
+// GetGlobalUploadLimit gets the global upload speed limit
+func (qb *Client) GetGlobalUploadLimit() (int, error) {
+	endpoint := fmt.Sprintf("%s/api/v2/transfer/uploadLimit", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodGet, endpoint, nil, nil)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get global upload limit: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("failed to get global upload limit. Status: %d, Response: %s", resp.StatusCode, string(body))
+	}
+
+	var limit int
+	if err := json.Unmarshal(body, &limit); err != nil {
+		return 0, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return limit, nil
 }
 
 // ToggleSpeedLimits toggles speed limits
@@ -989,12 +1053,96 @@ func (qb *Client) SetTorrentUploadLimit(hash string, limit int) error {
 	return nil
 }
 
-// SetTorrentShareLimit sets ratio limit for a specific torrent
-func (qb *Client) SetTorrentShareLimit(hash string, ratioLimit float64, seedingTimeLimit int) error {
+// GetTorrentDownloadLimit gets download speed limit for a specific torrent
+func (qb *Client) GetTorrentDownloadLimit(hash string) (int, error) {
 	data := url.Values{
-		"hashes":           {hash},
-		"ratioLimit":       {fmt.Sprintf("%.2f", ratioLimit)},
-		"seedingTimeLimit": {fmt.Sprintf("%d", seedingTimeLimit)},
+		"hashes": {hash},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/downloadLimit", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get torrent download limit: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("failed to get torrent download limit. Status: %d, Response: %s", resp.StatusCode, string(body))
+	}
+
+	var result map[string]int
+	if err := json.Unmarshal(body, &result); err != nil {
+		return 0, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	limit, exists := result[hash]
+	if !exists {
+		return 0, fmt.Errorf("download limit not found for hash: %s", hash)
+	}
+
+	return limit, nil
+}
+
+// GetTorrentUploadLimit gets upload speed limit for a specific torrent
+func (qb *Client) GetTorrentUploadLimit(hash string) (int, error) {
+	data := url.Values{
+		"hashes": {hash},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/uploadLimit", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get torrent upload limit: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("failed to get torrent upload limit. Status: %d, Response: %s", resp.StatusCode, string(body))
+	}
+
+	var result map[string]int
+	if err := json.Unmarshal(body, &result); err != nil {
+		return 0, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	limit, exists := result[hash]
+	if !exists {
+		return 0, fmt.Errorf("upload limit not found for hash: %s", hash)
+	}
+
+	return limit, nil
+}
+
+// SetTorrentShareLimit sets share limits for a specific torrent
+// ratioLimit: -2 means use global limit, -1 means no limit
+// seedingTimeLimit: -2 means use global limit, -1 means no limit (in minutes)
+// inactiveSeedingTimeLimit: -2 means use global limit, -1 means no limit (in minutes)
+func (qb *Client) SetTorrentShareLimit(hash string, ratioLimit float64, seedingTimeLimit int, inactiveSeedingTimeLimit int) error {
+	data := url.Values{
+		"hashes":                   {hash},
+		"ratioLimit":               {fmt.Sprintf("%.2f", ratioLimit)},
+		"seedingTimeLimit":         {fmt.Sprintf("%d", seedingTimeLimit)},
+		"inactiveSeedingTimeLimit": {fmt.Sprintf("%d", inactiveSeedingTimeLimit)},
 	}
 
 	headers := map[string]string{
