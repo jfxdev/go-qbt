@@ -1002,8 +1002,8 @@ func (qb *Client) SetAlternativeRateLimits(downloadLimit, uploadLimit int) error
 // SetTorrentDownloadLimit sets download speed limit for a specific torrent
 func (qb *Client) SetTorrentDownloadLimit(hash string, limit int) error {
 	data := url.Values{
-		"hashes":   {hash},
-		"dl_limit": {fmt.Sprintf("%d", limit)},
+		"hashes": {hash},
+		"limit":  {fmt.Sprintf("%d", limit)},
 	}
 
 	headers := map[string]string{
@@ -1029,8 +1029,8 @@ func (qb *Client) SetTorrentDownloadLimit(hash string, limit int) error {
 // SetTorrentUploadLimit sets upload speed limit for a specific torrent
 func (qb *Client) SetTorrentUploadLimit(hash string, limit int) error {
 	data := url.Values{
-		"hashes":   {hash},
-		"up_limit": {fmt.Sprintf("%d", limit)},
+		"hashes": {hash},
+		"limit":  {fmt.Sprintf("%d", limit)},
 	}
 
 	headers := map[string]string{
