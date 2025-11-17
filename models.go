@@ -7,6 +7,12 @@ import (
 	"time"
 )
 
+const (
+	StatusConnected    = "connected"
+	StatusUnauthorized = "unauthorized"
+	StatusUnaccessible = "unaccessible"
+)
+
 // Client is a high-level qBittorrent API client with cookie cache and retries.
 type Client struct {
 	mu              sync.RWMutex
@@ -21,6 +27,7 @@ type Client struct {
 	lastLoginTime time.Time
 	cookieValid   bool
 	cookieValidMu sync.RWMutex
+	status        string
 }
 
 // Config contains runtime client settings and credentials.

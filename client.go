@@ -3,9 +3,11 @@ package qbt
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -76,6 +78,12 @@ func (qb *Client) Update(config Config) {
 	qb.invalidateCookies()
 }
 
+func (qb *Client) Status() string {
+	qb.mu.RLock()
+	defer qb.mu.RUnlock()
+	return qb.status
+}
+
 func (qb *Client) loginWithContext(ctx context.Context) error {
 	data := url.Values{
 		"username": {qb.config.Username},
@@ -99,20 +107,56 @@ func (qb *Client) loginWithContext(ctx context.Context) error {
 		request.WithContext(loginCtx),
 	)
 	if err != nil {
+		// Check for timeout or hostname resolution errors
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			qb.setStatus(StatusUnaccessible)
+			return fmt.Errorf("login timeout: %w", err)
+		}
+
+		// Check for DNS/hostname resolution errors
+		var dnsErr *net.DNSError
+		if errors.As(err, &dnsErr) {
+			qb.setStatus(StatusUnaccessible)
+			return fmt.Errorf("hostname resolution failed: %w", err)
+		}
+
+		// Check for network connection errors
+		var opErr *net.OpError
+		if errors.As(err, &opErr) {
+			qb.setStatus(StatusUnaccessible)
+			return fmt.Errorf("network connection failed: %w", err)
+		}
+
+		// For other errors, check if it's a timeout-related error
+		if strings.Contains(err.Error(), "timeout") || strings.Contains(err.Error(), "deadline exceeded") {
+			qb.setStatus(StatusUnaccessible)
+			return fmt.Errorf("login timeout: %w", err)
+		}
+
 		return err
 	}
 
 	defer resp.Body.Close()
 
+	// Read response body to check for "Fails." message
+	body, _ := io.ReadAll(resp.Body)
+	bodyStr := strings.TrimSpace(string(body))
+
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("login failed. Status: %d, Response: %s", resp.StatusCode, body)
+		return fmt.Errorf("login failed. Status: %d, Response: %s", resp.StatusCode, bodyStr)
+	}
+
+	// Check if response contains "Fails." message even with 200 status
+	if strings.Contains(bodyStr, "Fails.") {
+		qb.setStatus(StatusUnauthorized)
+		return fmt.Errorf("login failed: %s", bodyStr)
 	}
 
 	// Update cookie cache and mark as valid
 	qb.updateCookieCache(resp.Cookies())
 	qb.setCookieValid(true)
 	qb.lastLoginTime = time.Now()
+	qb.setStatus(StatusConnected)
 
 	if qb.config.Debug {
 		log.Println("Login successful, cookies cached")
@@ -179,6 +223,18 @@ func (qb *Client) setCookieValid(valid bool) {
 	qb.cookieValid = valid
 }
 
+func (qb *Client) setStatus(status string) {
+	qb.mu.Lock()
+	defer qb.mu.Unlock()
+	qb.status = status
+}
+
+func (qb *Client) GetStatus() string {
+	qb.mu.RLock()
+	defer qb.mu.RUnlock()
+	return qb.status
+}
+
 func (qb *Client) isCookieExpired() bool {
 	return time.Since(qb.lastLoginTime) > CookieExpiryDuration
 }
@@ -186,6 +242,7 @@ func (qb *Client) isCookieExpired() bool {
 func (qb *Client) invalidateCookies() {
 	qb.setCookieValid(false)
 	qb.cookieCache.clear()
+	qb.setStatus(StatusUnauthorized)
 }
 
 func (qb *Client) updateCookieCache(cookies []*http.Cookie) {
@@ -280,6 +337,7 @@ func (qb *Client) startCookieCleanup() {
 		if qb.isCookieExpired() {
 			qb.setCookieValid(false)
 			qb.cookieCache.clear()
+			qb.setStatus(StatusUnauthorized)
 			if qb.config.Debug {
 				log.Println("Cookies expired, cleared from cache")
 			}
