@@ -678,13 +678,18 @@ func (qb *Client) SetGlobalSettings(settings GlobalSettings) error {
 		return fmt.Errorf("failed to marshal settings: %w", err)
 	}
 
+	// The API requires application/x-www-form-urlencoded with a 'json' field
+	data := url.Values{
+		"json": {string(jsonData)},
+	}
+
 	headers := map[string]string{
-		"Content-Type": "application/json",
+		"Content-Type": "application/x-www-form-urlencoded",
 	}
 
 	endpoint := fmt.Sprintf("%s/api/v2/app/setPreferences", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(string(jsonData)), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to set global settings: %w", err)
 	}
@@ -839,10 +844,10 @@ func (qb *Client) GetNetworkInfo() (*NetworkInfo, error) {
 	return &info, nil
 }
 
-// SetDownloadSpeedLimit sets the download speed limit
-func (qb *Client) SetDownloadSpeedLimit(limit int) error {
+// SetGlobalDownloadSpeedLimit sets the download speed limit
+func (qb *Client) SetGlobalDownloadSpeedLimit(limit int) error {
 	data := url.Values{
-		"dl_limit": {fmt.Sprintf("%d", limit)},
+		"limit": {fmt.Sprintf("%d", limit)},
 	}
 
 	headers := map[string]string{
@@ -892,10 +897,10 @@ func (qb *Client) GetGlobalDownloadLimit() (int, error) {
 	return limit, nil
 }
 
-// SetUploadSpeedLimit sets the upload speed limit
-func (qb *Client) SetUploadSpeedLimit(limit int) error {
+// SetGlobalUploadSpeedLimit sets the upload speed limit
+func (qb *Client) SetGlobalUploadSpeedLimit(limit int) error {
 	data := url.Values{
-		"up_limit": {fmt.Sprintf("%d", limit)},
+		"limit": {fmt.Sprintf("%d", limit)},
 	}
 
 	headers := map[string]string{
@@ -963,40 +968,42 @@ func (qb *Client) ToggleSpeedLimits() error {
 	return nil
 }
 
-// SetGlobalRateLimits sets global download and upload speed limits
-func (qb *Client) SetGlobalRateLimits(downloadLimit, uploadLimit int) error {
-	// Get current global settings
-	settings, err := qb.GetGlobalSettings()
-	if err != nil {
-		return fmt.Errorf("failed to get global settings: %w", err)
-	}
-
-	// Update the rate limits
-	settings.GlobalDLSpeedLimit = downloadLimit
-	settings.GlobalUPSpeedLimit = uploadLimit
-	settings.GlobalDLSpeedLimitEnabled = downloadLimit > 0
-	settings.GlobalUPSpeedLimitEnabled = uploadLimit > 0
-
-	// Apply the updated settings
-	return qb.SetGlobalSettings(*settings)
-}
-
 // SetAlternativeRateLimits sets alternative global download and upload speed limits
 func (qb *Client) SetAlternativeRateLimits(downloadLimit, uploadLimit int) error {
-	// Get current global settings
-	settings, err := qb.GetGlobalSettings()
-	if err != nil {
-		return fmt.Errorf("failed to get global settings: %w", err)
+	// Create a map with only the fields to update
+	updates := map[string]interface{}{
+		"alt_dl_limit": downloadLimit,
+		"alt_up_limit": uploadLimit,
 	}
 
-	// Update the alternative rate limits
-	settings.AltGlobalSpeedLimit = downloadLimit
-	settings.AlternativeGlobalSpeedLimit = uploadLimit
-	settings.AltGlobalSpeedLimitEnabled = downloadLimit > 0
-	settings.AlternativeGlobalSpeedLimitEnabled = uploadLimit > 0
+	jsonData, err := json.Marshal(updates)
+	if err != nil {
+		return fmt.Errorf("failed to marshal settings: %w", err)
+	}
 
-	// Apply the updated settings
-	return qb.SetGlobalSettings(*settings)
+	// The API requires application/x-www-form-urlencoded with a 'json' field
+	data := url.Values{
+		"json": {string(jsonData)},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/app/setPreferences", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to set alternative rate limits: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to set alternative rate limits. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
 }
 
 // SetTorrentDownloadLimit sets download speed limit for a specific torrent
@@ -1328,118 +1335,42 @@ func (qb *Client) SuperSeedingMode(hash string, enabled bool) error {
 	return nil
 }
 
-// ===== MAXIMUM ACTIVE TORRENT MANAGEMENT =====
-
-// SetMaxActiveDownloads sets the maximum number of active downloads
-func (qb *Client) SetMaxActiveDownloads(maxDownloads int) error {
-	// Get current global settings
-	settings, err := qb.GetGlobalSettings()
-	if err != nil {
-		return fmt.Errorf("failed to get global settings: %w", err)
-	}
-
-	// Update the max active downloads
-	settings.MaxActiveDownloads = maxDownloads
-
-	// Apply the updated settings
-	return qb.SetGlobalSettings(*settings)
-}
-
-// SetMaxActiveUploads sets the maximum number of active uploads
-func (qb *Client) SetMaxActiveUploads(maxUploads int) error {
-	// Get current global settings
-	settings, err := qb.GetGlobalSettings()
-	if err != nil {
-		return fmt.Errorf("failed to get global settings: %w", err)
-	}
-
-	// Update the max active uploads
-	settings.MaxActiveUploads = maxUploads
-
-	// Apply the updated settings
-	return qb.SetGlobalSettings(*settings)
-}
-
-// SetMaxActiveTorrents sets the maximum number of active torrents
-func (qb *Client) SetMaxActiveTorrents(maxTorrents int) error {
-	// Get current global settings
-	settings, err := qb.GetGlobalSettings()
-	if err != nil {
-		return fmt.Errorf("failed to get global settings: %w", err)
-	}
-
-	// Update the max active torrents
-	settings.MaxActiveTorrents = maxTorrents
-
-	// Apply the updated settings
-	return qb.SetGlobalSettings(*settings)
-}
-
-// SetMaxActiveCheckingTorrents sets the maximum number of active checking torrents
-func (qb *Client) SetMaxActiveCheckingTorrents(maxChecking int) error {
-	// Get current global settings
-	settings, err := qb.GetGlobalSettings()
-	if err != nil {
-		return fmt.Errorf("failed to get global settings: %w", err)
-	}
-
-	// Update the max active checking torrents
-	settings.MaxActiveCheckingTorrents = maxChecking
-
-	// Apply the updated settings
-	return qb.SetGlobalSettings(*settings)
-}
-
 // SetMaxActiveTorrentLimits sets all maximum active torrent limits at once
 func (qb *Client) SetMaxActiveTorrentLimits(maxDownloads, maxUploads, maxTorrents, maxChecking int) error {
-	// Get current global settings
-	settings, err := qb.GetGlobalSettings()
-	if err != nil {
-		return fmt.Errorf("failed to get global settings: %w", err)
+	// Create a map with only the fields to update
+	updates := map[string]interface{}{
+		"max_active_downloads":         maxDownloads,
+		"max_active_uploads":           maxUploads,
+		"max_active_torrents":          maxTorrents,
+		"max_active_checking_torrents": maxChecking,
 	}
 
-	// Update all the max active limits
-	settings.MaxActiveDownloads = maxDownloads
-	settings.MaxActiveUploads = maxUploads
-	settings.MaxActiveTorrents = maxTorrents
-	settings.MaxActiveCheckingTorrents = maxChecking
-
-	// Apply the updated settings
-	return qb.SetGlobalSettings(*settings)
-}
-
-// GetMaxActiveDownloads gets the current maximum number of active downloads
-func (qb *Client) GetMaxActiveDownloads() (int, error) {
-	settings, err := qb.GetGlobalSettings()
+	jsonData, err := json.Marshal(updates)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get global settings: %w", err)
+		return fmt.Errorf("failed to marshal settings: %w", err)
 	}
-	return settings.MaxActiveDownloads, nil
-}
 
-// GetMaxActiveUploads gets the current maximum number of active uploads
-func (qb *Client) GetMaxActiveUploads() (int, error) {
-	settings, err := qb.GetGlobalSettings()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get global settings: %w", err)
+	// The API requires application/x-www-form-urlencoded with a 'json' field
+	data := url.Values{
+		"json": {string(jsonData)},
 	}
-	return settings.MaxActiveUploads, nil
-}
 
-// GetMaxActiveTorrents gets the current maximum number of active torrents
-func (qb *Client) GetMaxActiveTorrents() (int, error) {
-	settings, err := qb.GetGlobalSettings()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get global settings: %w", err)
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
 	}
-	return settings.MaxActiveTorrents, nil
-}
 
-// GetMaxActiveCheckingTorrents gets the current maximum number of active checking torrents
-func (qb *Client) GetMaxActiveCheckingTorrents() (int, error) {
-	settings, err := qb.GetGlobalSettings()
+	endpoint := fmt.Sprintf("%s/api/v2/app/setPreferences", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get global settings: %w", err)
+		return fmt.Errorf("failed to set max active torrent limits: %w", err)
 	}
-	return settings.MaxActiveCheckingTorrents, nil
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to set max active torrent limits. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
 }

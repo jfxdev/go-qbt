@@ -262,9 +262,9 @@ type GlobalSettings struct {
 	MaxRatioAct                        int     `json:"max_ratio_act"`                          // Max ratio action
 	ListenPort                         int     `json:"listen_port"`                            // Listen port
 	MaxActiveTorrents                  int     `json:"max_active_torrents"`                    // Max active torrents
-	MaxActiveCheckingTorrents          int     `json:"max_active_checking_torrents"`           // Max active checking torrents
 	MaxActiveDownloads                 int     `json:"max_active_downloads"`                   // Max active downloads
 	MaxActiveUploads                   int     `json:"max_active_uploads"`                     // Max active uploads
+	MaxActiveCheckingTorrents          int     `json:"max_active_checking_torrents"`           // Max active checking torrents
 	AlternativeGlobalSpeedLimit        int     `json:"alternative_global_speed_limit"`         // Alternative global speed limit
 	AlternativeGlobalSpeedLimitEnabled bool    `json:"alternative_global_speed_limit_enabled"` // Alternative global speed limit enabled
 	GlobalSpeedLimit                   int     `json:"global_speed_limit"`                     // Global speed limit
