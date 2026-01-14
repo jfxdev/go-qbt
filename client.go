@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -56,6 +55,8 @@ func New(config Config) (*Client, error) {
 		retryConfig:     newRetryConfig(config),
 		lastLoginTime:   time.Time{},
 		cookieValid:     false,
+		status:          StatusInitializing,
+		authFailed:      false,
 	}
 
 	// Start periodic cookie cleanup routine
@@ -84,7 +85,54 @@ func (qb *Client) Status() string {
 	return qb.status
 }
 
+// checkAccessibility verifies that the qBittorrent API is accessible before attempting login.
+// This helps distinguish between infrastructure issues (502, 503) and authentication issues.
+func (qb *Client) checkAccessibility(ctx context.Context) error {
+	// Use the version endpoint which doesn't require authentication
+	checkCtx, cancel := context.WithTimeout(ctx, qb.config.RequestTimeout)
+	defer cancel()
+
+	resp, err := request.Do(http.MethodGet,
+		fmt.Sprintf("%s/api/v2/app/version", qb.config.BaseURL),
+		request.WithContext(checkCtx),
+	)
+	if err != nil {
+		// Classify network-level errors
+		clientErr := ClassifyError(err)
+		qb.setStatus(StatusUnaccessible)
+		qb.SetLastError(clientErr)
+		return clientErr
+	}
+	defer resp.Body.Close()
+
+	// Check for HTTP-level errors that indicate infrastructure issues
+	if resp.StatusCode >= 500 {
+		clientErr := classifyHTTPStatusCode(resp.StatusCode, "")
+		qb.setStatus(StatusUnaccessible)
+		qb.SetLastError(clientErr)
+		return clientErr
+	}
+
+	// API is accessible
+	return nil
+}
+
 func (qb *Client) loginWithContext(ctx context.Context) error {
+	// Check if auth has permanently failed - don't attempt login
+	if qb.IsAuthFailed() {
+		return NewClientError(
+			ErrorCodeAuthFailure,
+			"Authentication has permanently failed - update credentials and restart",
+			nil,
+			true,
+		)
+	}
+
+	// First check if the API is accessible before attempting login
+	if err := qb.checkAccessibility(ctx); err != nil {
+		return err
+	}
+
 	data := url.Values{
 		"username": {qb.config.Username},
 		"password": {qb.config.Password},
@@ -107,33 +155,13 @@ func (qb *Client) loginWithContext(ctx context.Context) error {
 		request.WithContext(loginCtx),
 	)
 	if err != nil {
-		// Check for timeout or hostname resolution errors
-		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-			qb.setStatus(StatusUnaccessible)
-			return fmt.Errorf("login timeout: %w", err)
-		}
+		// Classify the error
+		clientErr := ClassifyError(err)
+		qb.setStatus(StatusUnaccessible)
+		qb.SetLastError(clientErr)
 
-		// Check for DNS/hostname resolution errors
-		var dnsErr *net.DNSError
-		if errors.As(err, &dnsErr) {
-			qb.setStatus(StatusUnaccessible)
-			return fmt.Errorf("hostname resolution failed: %w", err)
-		}
-
-		// Check for network connection errors
-		var opErr *net.OpError
-		if errors.As(err, &opErr) {
-			qb.setStatus(StatusUnaccessible)
-			return fmt.Errorf("network connection failed: %w", err)
-		}
-
-		// For other errors, check if it's a timeout-related error
-		if strings.Contains(err.Error(), "timeout") || strings.Contains(err.Error(), "deadline exceeded") {
-			qb.setStatus(StatusUnaccessible)
-			return fmt.Errorf("login timeout: %w", err)
-		}
-
-		return err
+		// Return the classified error
+		return clientErr
 	}
 
 	defer resp.Body.Close()
@@ -143,13 +171,23 @@ func (qb *Client) loginWithContext(ctx context.Context) error {
 	bodyStr := strings.TrimSpace(string(body))
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("login failed. Status: %d, Response: %s", resp.StatusCode, bodyStr)
+		clientErr := classifyHTTPStatusCode(resp.StatusCode, bodyStr)
+		qb.SetLastError(clientErr)
+		return clientErr
 	}
 
 	// Check if response contains "Fails." message even with 200 status
 	if strings.Contains(bodyStr, "Fails.") {
 		qb.setStatus(StatusUnauthorized)
-		return fmt.Errorf("login failed: %s", bodyStr)
+		clientErr := NewClientError(
+			ErrorCodeAuthFailure,
+			"Invalid username or password",
+			nil,
+			true,
+		)
+		qb.SetLastError(clientErr)
+		qb.setAuthFailed(true) // Mark as permanent failure
+		return clientErr
 	}
 
 	// Update cookie cache and mark as valid
@@ -157,6 +195,7 @@ func (qb *Client) loginWithContext(ctx context.Context) error {
 	qb.setCookieValid(true)
 	qb.lastLoginTime = time.Now()
 	qb.setStatus(StatusConnected)
+	qb.SetLastError(nil) // Clear any previous error
 
 	if qb.config.Debug {
 		log.Println("Login successful, cookies cached")
@@ -235,6 +274,73 @@ func (qb *Client) GetStatus() string {
 	return qb.status
 }
 
+// SetLastError stores the last error that occurred
+func (qb *Client) SetLastError(err error) {
+	qb.lastErrorMu.Lock()
+	defer qb.lastErrorMu.Unlock()
+
+	if err == nil {
+		qb.lastError = nil
+		return
+	}
+
+	// Classify the error
+	var clientErr *ClientError
+	if errors.As(err, &clientErr) {
+		qb.lastError = clientErr
+	} else {
+		qb.lastError = ClassifyError(err)
+	}
+
+	// If it's an auth failure, set the permanent flag
+	if qb.lastError != nil && qb.lastError.Code == ErrorCodeAuthFailure {
+		qb.setAuthFailed(true)
+	}
+}
+
+// GetLastError returns the last error that occurred
+func (qb *Client) GetLastError() *ClientError {
+	qb.lastErrorMu.RLock()
+	defer qb.lastErrorMu.RUnlock()
+	return qb.lastError
+}
+
+// GetConnectionStatus returns the detailed connection status
+func (qb *Client) GetConnectionStatus() *ConnectionStatus {
+	status := &ConnectionStatus{
+		Status: qb.GetStatus(),
+	}
+
+	if lastErr := qb.GetLastError(); lastErr != nil {
+		status.ErrorCode = lastErr.Code
+		status.Message = lastErr.Message
+		status.Permanent = lastErr.Permanent
+	}
+
+	return status
+}
+
+// setAuthFailed sets the authentication failure flag
+func (qb *Client) setAuthFailed(failed bool) {
+	qb.authFailedMu.Lock()
+	defer qb.authFailedMu.Unlock()
+	qb.authFailed = failed
+}
+
+// IsAuthFailed returns true if authentication has permanently failed
+func (qb *Client) IsAuthFailed() bool {
+	qb.authFailedMu.RLock()
+	defer qb.authFailedMu.RUnlock()
+	return qb.authFailed
+}
+
+// ResetAuthFailure resets the authentication failure flag (call after credential update)
+func (qb *Client) ResetAuthFailure() {
+	qb.setAuthFailed(false)
+	qb.SetLastError(nil)
+	qb.setStatus(StatusInitializing)
+}
+
 func (qb *Client) isCookieExpired() bool {
 	return time.Since(qb.lastLoginTime) > CookieExpiryDuration
 }
@@ -287,6 +393,16 @@ func (qb *Client) retryWithBackoffWithContext(ctx context.Context, operation fun
 		default:
 		}
 
+		// Check if auth has permanently failed
+		if qb.IsAuthFailed() {
+			return NewClientError(
+				ErrorCodeAuthFailure,
+				"Authentication has permanently failed - update credentials and restart",
+				nil,
+				true,
+			)
+		}
+
 		if err := operation(); err == nil {
 			if attempt > 0 && qb.config.Debug {
 				log.Printf("%s succeeded after %d retries", operationName, attempt)
@@ -294,6 +410,14 @@ func (qb *Client) retryWithBackoffWithContext(ctx context.Context, operation fun
 			return nil
 		} else {
 			lastErr = err
+
+			// Check if this is a permanent error - don't retry
+			if IsPermanentError(err) {
+				if qb.config.Debug {
+					log.Printf("%s failed with permanent error, not retrying: %v", operationName, err)
+				}
+				return err
+			}
 		}
 
 		if attempt < qb.retryConfig.MaxRetries {

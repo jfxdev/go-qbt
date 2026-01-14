@@ -11,7 +11,18 @@ const (
 	StatusConnected    = "connected"
 	StatusUnauthorized = "unauthorized"
 	StatusUnaccessible = "unaccessible"
+	StatusInitializing = "initializing"
+	StatusPending      = "pending"
+	StatusError        = "error"
 )
+
+// ConnectionStatus represents the detailed connection state of the client
+type ConnectionStatus struct {
+	Status    string    `json:"status"`
+	ErrorCode ErrorCode `json:"error_code,omitempty"`
+	Message   string    `json:"message,omitempty"`
+	Permanent bool      `json:"permanent,omitempty"`
+}
 
 // Client is a high-level qBittorrent API client with cookie cache and retries.
 type Client struct {
@@ -28,6 +39,12 @@ type Client struct {
 	cookieValid   bool
 	cookieValidMu sync.RWMutex
 	status        string
+
+	// Error tracking for detailed status
+	lastError    *ClientError
+	lastErrorMu  sync.RWMutex
+	authFailed   bool // Permanent flag - stops operations until reset
+	authFailedMu sync.RWMutex
 }
 
 // Config contains runtime client settings and credentials.
