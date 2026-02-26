@@ -351,11 +351,14 @@ func (qb *Client) invalidateCookies() {
 	qb.setStatus(StatusUnauthorized)
 
 	// Recreate cookie jar to ensure old cookies aren't used
-	if jar, err := cookiejar.New(nil); err == nil {
+	jar, err := cookiejar.New(nil)
+	if err == nil {
 		qb.mu.Lock()
 		qb.config.jar = jar
 		qb.client.Jar = jar
 		qb.mu.Unlock()
+	} else if qb.config.Debug {
+		log.Printf("failed to recreate cookie jar: %v", err)
 	}
 }
 
