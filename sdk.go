@@ -1,19 +1,19 @@
 package qbt
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/jfxdev/go-qbt/request"
 )
 
 // Helper to perform requests with automatic retry
-func (qb *Client) doWithRetry(method, endpoint string, body io.Reader, headers map[string]string) (*http.Response, error) {
+func (qb *Client) doWithRetry(method, endpoint string, body []byte, headers map[string]string) (*http.Response, error) {
 	var resp *http.Response
 	var err error
 
@@ -24,9 +24,14 @@ func (qb *Client) doWithRetry(method, endpoint string, body io.Reader, headers m
 			return fmt.Errorf("failed to ensure login: %w", err)
 		}
 
+		var bodyReader io.Reader
+		if body != nil {
+			bodyReader = bytes.NewReader(body)
+		}
+
 		// Perform the request without context to avoid cancellation issues
 		resp, err = request.Do(method, endpoint,
-			request.WithBody(body),
+			request.WithBody(bodyReader),
 			request.WithHeaders(headers),
 			request.WithCookieJar(qb.config.jar),
 		)
@@ -105,7 +110,7 @@ func (qb *Client) AddTorrentLink(opts TorrentConfig) error {
 
 	endpoint := fmt.Sprintf("%s/api/v2/torrents/add", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to add torrent: %w", err)
 	}
@@ -132,7 +137,7 @@ func (qb *Client) updateTorrentStatus(action, hash string, optional map[string]s
 
 	endpoint := fmt.Sprintf("%s/api/v2/torrents/%s", qb.config.BaseURL, action)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to %s torrent: %w", action, err)
 	}
@@ -182,7 +187,7 @@ func (qb *Client) AddTorrentTags(hash string, tags []string) error {
 
 	endpoint := fmt.Sprintf("%s/api/v2/torrents/addTags", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to add tags: %w", err)
 	}
@@ -208,7 +213,7 @@ func (qb *Client) DeleteTorrentTags(hash string, tags []string) error {
 
 	endpoint := fmt.Sprintf("%s/api/v2/torrents/removeTags", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to remove tags: %w", err)
 	}
@@ -234,7 +239,7 @@ func (qb *Client) SetCategory(hash string, category string) error {
 
 	endpoint := fmt.Sprintf("%s/api/v2/torrents/setCategory", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to set category: %w", err)
 	}
@@ -260,7 +265,7 @@ func (qb *Client) RemoveCategory(hash string) error {
 
 	endpoint := fmt.Sprintf("%s/api/v2/torrents/setCategory", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to remove category: %w", err)
 	}
@@ -315,7 +320,7 @@ func (qb *Client) ForceRecheck(hash string) error {
 
 	endpoint := fmt.Sprintf("%s/api/v2/torrents/recheck", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to force recheck: %w", err)
 	}
@@ -340,7 +345,7 @@ func (qb *Client) ForceReannounce(hash string) error {
 
 	endpoint := fmt.Sprintf("%s/api/v2/torrents/reannounce", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to force reannounce: %w", err)
 	}
@@ -454,7 +459,7 @@ func (qb *Client) ForceStart(hash string) error {
 
 	endpoint := fmt.Sprintf("%s/api/v2/torrents/setForceStart", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to force start torrent: %w", err)
 	}
@@ -689,7 +694,7 @@ func (qb *Client) SetGlobalSettings(settings GlobalSettings) error {
 
 	endpoint := fmt.Sprintf("%s/api/v2/app/setPreferences", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to set global settings: %w", err)
 	}
@@ -743,7 +748,7 @@ func (qb *Client) CreateCategory(name, savePath string) error {
 
 	endpoint := fmt.Sprintf("%s/api/v2/torrents/createCategory", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to create category: %w", err)
 	}
@@ -769,7 +774,7 @@ func (qb *Client) DeleteCategory(name string) error {
 
 	endpoint := fmt.Sprintf("%s/api/v2/torrents/deleteCategory", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to delete category: %w", err)
 	}
@@ -817,6 +822,36 @@ func (qb *Client) GetLogs(normal bool, info bool, warning bool, critical bool, l
 	return logs, nil
 }
 
+// GetPeerLogs gets peer logs
+func (qb *Client) GetPeerLogs(lastKnownID int) ([]*PeerLogEntry, error) {
+	params := url.Values{}
+	params.Add("last_known_id", fmt.Sprintf("%d", lastKnownID))
+
+	endpoint := fmt.Sprintf("%s/api/v2/log/peers?%s", qb.config.BaseURL, params.Encode())
+
+	resp, err := qb.doWithRetry(http.MethodGet, endpoint, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get peer logs: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get peer logs. Status: %d, Response: %s", resp.StatusCode, string(body))
+	}
+
+	var logs []*PeerLogEntry
+	if err := json.Unmarshal(body, &logs); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return logs, nil
+}
+
 // GetNetworkInfo gets network information
 func (qb *Client) GetNetworkInfo() (*NetworkInfo, error) {
 	endpoint := fmt.Sprintf("%s/api/v2/transfer/info", qb.config.BaseURL)
@@ -856,7 +891,7 @@ func (qb *Client) SetGlobalDownloadSpeedLimit(limit int) error {
 
 	endpoint := fmt.Sprintf("%s/api/v2/transfer/setDownloadLimit", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to set download speed limit: %w", err)
 	}
@@ -909,7 +944,7 @@ func (qb *Client) SetGlobalUploadSpeedLimit(limit int) error {
 
 	endpoint := fmt.Sprintf("%s/api/v2/transfer/setUploadLimit", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to set upload speed limit: %w", err)
 	}
@@ -992,7 +1027,7 @@ func (qb *Client) SetAlternativeRateLimits(downloadLimit, uploadLimit int) error
 
 	endpoint := fmt.Sprintf("%s/api/v2/app/setPreferences", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to set alternative rate limits: %w", err)
 	}
@@ -1019,7 +1054,7 @@ func (qb *Client) SetTorrentDownloadLimit(hash string, limit int) error {
 
 	endpoint := fmt.Sprintf("%s/api/v2/torrents/setDownloadLimit", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to set torrent download limit: %w", err)
 	}
@@ -1046,7 +1081,7 @@ func (qb *Client) SetTorrentUploadLimit(hash string, limit int) error {
 
 	endpoint := fmt.Sprintf("%s/api/v2/torrents/setUploadLimit", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to set torrent upload limit: %w", err)
 	}
@@ -1072,7 +1107,7 @@ func (qb *Client) GetTorrentDownloadLimit(hash string) (int, error) {
 
 	endpoint := fmt.Sprintf("%s/api/v2/torrents/downloadLimit", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get torrent download limit: %w", err)
 	}
@@ -1112,7 +1147,7 @@ func (qb *Client) GetTorrentUploadLimit(hash string) (int, error) {
 
 	endpoint := fmt.Sprintf("%s/api/v2/torrents/uploadLimit", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get torrent upload limit: %w", err)
 	}
@@ -1158,7 +1193,7 @@ func (qb *Client) SetTorrentShareLimit(hash string, ratioLimit float64, seedingT
 
 	endpoint := fmt.Sprintf("%s/api/v2/torrents/setShareLimits", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to set torrent share limit: %w", err)
 	}
@@ -1214,7 +1249,7 @@ func (qb *Client) AddRSSFeed(feedURL, path string) error {
 
 	endpoint := fmt.Sprintf("%s/api/v2/rss/addFeed", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to add RSS feed: %w", err)
 	}
@@ -1240,7 +1275,7 @@ func (qb *Client) RemoveRSSFeed(path string) error {
 
 	endpoint := fmt.Sprintf("%s/api/v2/rss/removeItem", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to remove RSS feed: %w", err)
 	}
@@ -1267,7 +1302,7 @@ func (qb *Client) SetTorrentLocation(hash string, location string) error {
 
 	endpoint := fmt.Sprintf("%s/api/v2/torrents/setLocation", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to set torrent location: %w", err)
 	}
@@ -1294,7 +1329,7 @@ func (qb *Client) RenameTorrent(hash string, newName string) error {
 
 	endpoint := fmt.Sprintf("%s/api/v2/torrents/rename", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to rename torrent: %w", err)
 	}
@@ -1321,7 +1356,7 @@ func (qb *Client) SuperSeedingMode(hash string, enabled bool) error {
 
 	endpoint := fmt.Sprintf("%s/api/v2/torrents/setSuperSeeding", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to set super seeding mode: %w", err)
 	}
@@ -1361,7 +1396,7 @@ func (qb *Client) SetMaxActiveTorrentLimits(maxDownloads, maxUploads, maxTorrent
 
 	endpoint := fmt.Sprintf("%s/api/v2/app/setPreferences", qb.config.BaseURL)
 
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, strings.NewReader(data.Encode()), headers)
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
 	if err != nil {
 		return fmt.Errorf("failed to set max active torrent limits: %w", err)
 	}

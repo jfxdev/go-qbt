@@ -308,6 +308,15 @@ type LogEntry struct {
 	Type      int    `json:"type"`      // Log type (normal=1, info=2, warning=4, critical=8)
 }
 
+// PeerLogEntry represents a peer log entry
+type PeerLogEntry struct {
+	ID        int    `json:"id"`        // Log entry ID
+	IP        string `json:"ip"`        // IP address
+	Timestamp int64  `json:"timestamp"` // Timestamp
+	Blocked   bool   `json:"blocked"`   // Whether the peer was blocked
+	Reason    string `json:"reason"`    // Reason for blocking
+}
+
 // NetworkInfo represents network information
 type NetworkInfo struct {
 	ConnectionStatus string `json:"connection_status"` // Connection status
