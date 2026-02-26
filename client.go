@@ -67,13 +67,13 @@ func New(config Config) (*Client, error) {
 
 func (qb *Client) Update(config Config) {
 	qb.mu.Lock()
-	defer qb.mu.Unlock()
 
 	// Update runtime configuration
 	qb.config = config
 	if config.RequestTimeout > 0 {
 		qb.client.Timeout = config.RequestTimeout
 	}
+	qb.mu.Unlock()
 
 	// Invalidate cookies to force re-login
 	qb.invalidateCookies()
@@ -349,6 +349,14 @@ func (qb *Client) invalidateCookies() {
 	qb.setCookieValid(false)
 	qb.cookieCache.clear()
 	qb.setStatus(StatusUnauthorized)
+
+	// Recreate cookie jar to ensure old cookies aren't used
+	if jar, err := cookiejar.New(nil); err == nil {
+		qb.mu.Lock()
+		qb.config.jar = jar
+		qb.client.Jar = jar
+		qb.mu.Unlock()
+	}
 }
 
 func (qb *Client) updateCookieCache(cookies []*http.Cookie) {
