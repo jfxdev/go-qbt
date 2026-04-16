@@ -18,13 +18,14 @@ import (
 
 // Default configuration constants
 const (
-	DefaultRequestTimeout = 30 * time.Second
-	DefaultMaxRetries     = 3
-	DefaultRetryBackoff   = 1 * time.Second
-	DefaultMaxDelay       = 30 * time.Second
-	DefaultBackoffFactor  = 2.0
-	CookieExpiryDuration  = 24 * time.Hour
-	CookieCheckInterval   = 5 * time.Minute
+	DefaultRequestTimeout  = 30 * time.Second
+	DefaultMaxRetries      = 3
+	DefaultRetryBackoff    = 1 * time.Second
+	DefaultMaxDelay        = 30 * time.Second
+	DefaultBackoffFactor   = 2.0
+	DefaultMaxLoginRetries = 5
+	CookieExpiryDuration   = 24 * time.Hour
+	CookieCheckInterval    = 5 * time.Minute
 )
 
 func New(config Config) (*Client, error) {
@@ -43,13 +44,16 @@ func New(config Config) (*Client, error) {
 	if config.RetryBackoff == 0 {
 		config.RetryBackoff = DefaultRetryBackoff
 	}
+	if config.MaxLoginRetries == 0 {
+		config.MaxLoginRetries = DefaultMaxLoginRetries
+	}
 
 	config.jar = jar
 
 	client := &Client{
 		config:          config,
 		client:          &http.Client{Jar: jar, Timeout: config.RequestTimeout},
-		MaxLoginRetries: 3,
+		MaxLoginRetries: config.MaxLoginRetries,
 		RetryDelay:      2 * time.Second,
 		cookieCache:     newCookieCache(),
 		retryConfig:     newRetryConfig(config),
@@ -117,12 +121,18 @@ func (qb *Client) checkAccessibility(ctx context.Context) error {
 	return nil
 }
 
+// Login attempts to authenticate with the qBittorrent API.
+// It can be used for an explicit startup check or on-demand re-authentication.
+func (qb *Client) Login(ctx context.Context) error {
+	return qb.loginWithContext(ctx)
+}
+
 func (qb *Client) loginWithContext(ctx context.Context) error {
 	// Check if auth has permanently failed - don't attempt login
 	if qb.IsAuthFailed() {
 		return NewClientError(
 			ErrorCodeAuthFailure,
-			"Authentication has permanently failed - update credentials and restart",
+			fmt.Sprintf("Authentication permanently failed after %d consecutive attempts - update credentials and restart", qb.config.MaxLoginRetries),
 			nil,
 			true,
 		)
@@ -179,14 +189,26 @@ func (qb *Client) loginWithContext(ctx context.Context) error {
 	// Check if response contains "Fails." message even with 200 status
 	if strings.Contains(bodyStr, "Fails.") {
 		qb.setStatus(StatusUnauthorized)
+
+		// Increment consecutive failure counter
+		count := qb.incrementLoginFailCount()
+		permanent := count >= qb.config.MaxLoginRetries
+
+		if permanent {
+			qb.setAuthFailed(true)
+		}
+
 		clientErr := NewClientError(
 			ErrorCodeAuthFailure,
-			"Invalid username or password",
+			fmt.Sprintf("Invalid username or password (attempt %d/%d)", count, qb.config.MaxLoginRetries),
 			nil,
-			true,
+			permanent,
 		)
 		qb.SetLastError(clientErr)
-		qb.setAuthFailed(true) // Mark as permanent failure
+
+		if qb.config.Debug {
+			log.Printf("Login auth failure %d/%d, permanent=%v", count, qb.config.MaxLoginRetries, permanent)
+		}
 		return clientErr
 	}
 
@@ -196,6 +218,7 @@ func (qb *Client) loginWithContext(ctx context.Context) error {
 	qb.lastLoginTime = time.Now()
 	qb.setStatus(StatusConnected)
 	qb.SetLastError(nil) // Clear any previous error
+	qb.resetLoginFailCount()
 
 	if qb.config.Debug {
 		log.Println("Login successful, cookies cached")
@@ -291,11 +314,6 @@ func (qb *Client) SetLastError(err error) {
 	} else {
 		qb.lastError = ClassifyError(err)
 	}
-
-	// If it's an auth failure, set the permanent flag
-	if qb.lastError != nil && qb.lastError.Code == ErrorCodeAuthFailure {
-		qb.setAuthFailed(true)
-	}
 }
 
 // GetLastError returns the last error that occurred
@@ -337,8 +355,24 @@ func (qb *Client) IsAuthFailed() bool {
 // ResetAuthFailure resets the authentication failure flag (call after credential update)
 func (qb *Client) ResetAuthFailure() {
 	qb.setAuthFailed(false)
+	qb.resetLoginFailCount()
 	qb.SetLastError(nil)
 	qb.setStatus(StatusInitializing)
+}
+
+// incrementLoginFailCount increments and returns the new consecutive login failure count.
+func (qb *Client) incrementLoginFailCount() int {
+	qb.loginFailCountMu.Lock()
+	defer qb.loginFailCountMu.Unlock()
+	qb.loginFailCount++
+	return qb.loginFailCount
+}
+
+// resetLoginFailCount resets the consecutive login failure counter to zero.
+func (qb *Client) resetLoginFailCount() {
+	qb.loginFailCountMu.Lock()
+	defer qb.loginFailCountMu.Unlock()
+	qb.loginFailCount = 0
 }
 
 func (qb *Client) isCookieExpired() bool {

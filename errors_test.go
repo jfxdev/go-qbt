@@ -261,7 +261,7 @@ func TestIsPermanentError(t *testing.T) {
 	}{
 		{"nil error", nil, false},
 		{"timeout error", errors.New("connection timeout"), false},
-		{"auth error", errors.New("login failed"), true},
+		{"auth error", errors.New("authentication failed"), true},
 		{"connection refused", errors.New("connection refused"), false},
 		{"dns error", &net.DNSError{Err: "no such host", Name: "test"}, true},
 		{"ssl error", errors.New("certificate verify failed"), true},
@@ -285,7 +285,7 @@ func TestGetErrorCode(t *testing.T) {
 	}{
 		{"nil error", nil, ErrorCodeNone},
 		{"timeout error", errors.New("connection timeout"), ErrorCodeTimeout},
-		{"auth error", errors.New("login failed"), ErrorCodeAuthFailure},
+		{"auth error", errors.New("authentication failed"), ErrorCodeAuthFailure},
 		{"client error", NewClientError(ErrorCodeVersionIncompatible, "test", nil, true), ErrorCodeVersionIncompatible},
 	}
 

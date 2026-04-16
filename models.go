@@ -45,18 +45,23 @@ type Client struct {
 	lastErrorMu  sync.RWMutex
 	authFailed   bool // Permanent flag - stops operations until reset
 	authFailedMu sync.RWMutex
+
+	// Consecutive login failure counter (threshold before authFailed is set)
+	loginFailCount   int
+	loginFailCountMu sync.Mutex
 }
 
 // Config contains runtime client settings and credentials.
 type Config struct {
-	BaseURL        string
-	Username       string
-	Password       string
-	jar            *cookiejar.Jar
-	RequestTimeout time.Duration
-	MaxRetries     int
-	RetryBackoff   time.Duration
-	Debug          bool // Enable debug logging for session management
+	BaseURL         string
+	Username        string
+	Password        string
+	jar             *cookiejar.Jar
+	RequestTimeout  time.Duration
+	MaxRetries      int
+	RetryBackoff    time.Duration
+	MaxLoginRetries int  // Max consecutive auth failures before permanent lockout (default: 5)
+	Debug           bool // Enable debug logging for session management
 }
 
 // CookieCache stores session cookies to reduce validation requests.
