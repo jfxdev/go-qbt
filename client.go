@@ -323,6 +323,38 @@ func (qb *Client) GetLastError() *ClientError {
 	return qb.lastError
 }
 
+// RefreshConnectionStatus attempts to refresh the connection status by performing
+// a login if the client is not currently connected. This is intended to be called
+// by health check endpoints so they return fresh (not stale/cached) status.
+// It uses a short timeout and no retries to avoid blocking the caller.
+func (qb *Client) RefreshConnectionStatus(ctx context.Context) *ConnectionStatus {
+	currentStatus := qb.GetStatus()
+
+	// If already connected with valid cookies, just return current status
+	if currentStatus == StatusConnected && qb.isCookieValidCached() {
+		return qb.GetConnectionStatus()
+	}
+
+	// If auth has permanently failed, don't attempt refresh
+	if qb.IsAuthFailed() {
+		return qb.GetConnectionStatus()
+	}
+
+	// Attempt a fresh login with a short timeout to get real status
+	refreshCtx, cancel := context.WithTimeout(ctx, qb.config.RequestTimeout)
+	defer cancel()
+
+	if err := qb.loginWithContext(refreshCtx); err != nil {
+		if qb.config.Debug {
+			log.Printf("RefreshConnectionStatus: login failed: %v", err)
+		}
+		// Status and lastError were already updated by loginWithContext
+		return qb.GetConnectionStatus()
+	}
+
+	return qb.GetConnectionStatus()
+}
+
 // GetConnectionStatus returns the detailed connection status
 func (qb *Client) GetConnectionStatus() *ConnectionStatus {
 	status := &ConnectionStatus{
@@ -506,9 +538,13 @@ func (qb *Client) startCookieCleanup() {
 		if qb.isCookieExpired() {
 			qb.setCookieValid(false)
 			qb.cookieCache.clear()
-			qb.setStatus(StatusUnauthorized)
+			// Do NOT change status to StatusUnauthorized here.
+			// Cookie expiry is a normal lifecycle event — the next API call
+			// will trigger re-authentication via ensureLoginWithContext.
+			// Setting StatusUnauthorized here caused stale "auth failed" reports
+			// when the health endpoint read cached status.
 			if qb.config.Debug {
-				log.Println("Cookies expired, cleared from cache")
+				log.Println("Cookies expired, cleared from cache — next request will re-authenticate")
 			}
 		}
 	}
