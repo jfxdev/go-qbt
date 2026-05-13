@@ -2,6 +2,7 @@ package request
 
 import (
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,7 +15,7 @@ func TestWithTimeout(t *testing.T) {
 	timeout := 2 // segundos
 
 	// Cria um servidor de teste que simula um delay na resposta
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newIPv4Server(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(1 * time.Second) // Simula um pequeno delay (menor que o timeout)
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -38,7 +39,7 @@ func TestWithBody(t *testing.T) {
 	expectedBody := `{"message": "hello"}`
 
 	// Servidor de teste para capturar o corpo da requisição
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newIPv4Server(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		if string(body) != expectedBody {
 			t.Errorf("Esperado body '%s', mas recebeu '%s'", expectedBody, string(body))
@@ -60,7 +61,7 @@ func TestWithHeader(t *testing.T) {
 	expectedValue := "test-value"
 
 	// Servidor de teste para capturar cabeçalhos
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newIPv4Server(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get(expectedKey) != expectedValue {
 			t.Errorf("Esperado header '%s' com valor '%s', mas recebeu '%s'", expectedKey, expectedValue, r.Header.Get(expectedKey))
 		}
@@ -83,7 +84,7 @@ func TestWithHeaders(t *testing.T) {
 	}
 
 	// Servidor de teste para capturar múltiplos cabeçalhos
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newIPv4Server(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		for k, v := range expectedHeaders {
 			if r.Header.Get(k) != v {
 				t.Errorf("Esperado header '%s' com valor '%s', mas recebeu '%s'", k, v, r.Header.Get(k))
@@ -98,4 +99,18 @@ func TestWithHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Erro na requisição: %v", err)
 	}
+}
+
+func newIPv4Server(t *testing.T, handler http.Handler) *httptest.Server {
+	t.Helper()
+
+	listener, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("erro ao abrir listener de teste: %v", err)
+	}
+
+	server := httptest.NewUnstartedServer(handler)
+	server.Listener = listener
+	server.Start()
+	return server
 }

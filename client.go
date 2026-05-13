@@ -99,6 +99,7 @@ func (qb *Client) checkAccessibility(ctx context.Context) error {
 	resp, err := request.Do(http.MethodGet,
 		fmt.Sprintf("%s/api/v2/app/version", qb.config.BaseURL),
 		request.WithContext(checkCtx),
+		request.WithTimeoutDuration(qb.config.RequestTimeout),
 	)
 	if err != nil {
 		// Classify network-level errors
@@ -163,6 +164,7 @@ func (qb *Client) loginWithContext(ctx context.Context) error {
 		request.WithCookieJar(qb.config.jar),
 		request.WithUpdateCookies(),
 		request.WithContext(loginCtx),
+		request.WithTimeoutDuration(qb.config.RequestTimeout),
 	)
 	if err != nil {
 		// Classify the error
@@ -258,6 +260,7 @@ func (qb *Client) isCookieValid() bool {
 		fmt.Sprintf("%s/api/v2/app/version", qb.config.BaseURL),
 		request.WithCookieJar(qb.config.jar),
 		request.WithContext(ctx),
+		request.WithTimeoutDuration(qb.config.RequestTimeout),
 	)
 
 	if err != nil || resp.StatusCode != http.StatusOK {
@@ -408,6 +411,9 @@ func (qb *Client) resetLoginFailCount() {
 }
 
 func (qb *Client) isCookieExpired() bool {
+	if qb.lastLoginTime.IsZero() {
+		return false
+	}
 	return time.Since(qb.lastLoginTime) > CookieExpiryDuration
 }
 
@@ -569,6 +575,7 @@ func (qb *Client) Close() error {
 		request.WithCookieJar(qb.config.jar),
 		request.WithHeaders(headers),
 		request.WithContext(ctx),
+		request.WithTimeoutDuration(qb.config.RequestTimeout),
 	)
 	if err != nil {
 		// Even on error, ensure local cache is cleared

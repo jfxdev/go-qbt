@@ -2,8 +2,12 @@ package qbt
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -389,244 +393,410 @@ func TestDebugMode(t *testing.T) {
 	}
 }
 
-// Test new torrent management methods
 func TestSetTorrentLocation(t *testing.T) {
-	client, err := New(Config{
-		BaseURL:        "http://localhost:8080",
-		Username:       "test",
-		Password:       "test",
-		RequestTimeout: 30 * time.Second,
+	recorder := newAPITestRecorder(t)
+	client := newTestClient(t, recorder.handler())
+
+	if err := client.SetTorrentLocation("test_hash_123", "/new/path"); err != nil {
+		t.Fatalf("SetTorrentLocation returned error: %v", err)
+	}
+
+	recorder.assertCalls(t, []expectedCall{
+		{Path: "/api/v2/app/version", Method: http.MethodGet},
+		{Path: "/api/v2/auth/login", Method: http.MethodPost},
+		{
+			Path:   "/api/v2/torrents/setLocation",
+			Method: http.MethodPost,
+			Form: map[string]string{
+				"hashes":   "test_hash_123",
+				"location": "/new/path",
+			},
+		},
 	})
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
-
-	// Test with valid parameters
-	hash := "test_hash_123"
-	location := "/new/path"
-
-	// This test will fail in real scenario without a running qBittorrent instance
-	// but it validates the method signature and basic structure
-	err = client.SetTorrentLocation(hash, location)
-	if err != nil {
-		// Expected to fail without real qBittorrent instance
-		if !strings.Contains(err.Error(), "failed to set torrent location") {
-			t.Errorf("Unexpected error: %v", err)
-		}
-	}
 }
 
 func TestRenameTorrent(t *testing.T) {
-	client, err := New(Config{
-		BaseURL:        "http://localhost:8080",
-		Username:       "test",
-		Password:       "test",
-		RequestTimeout: 30 * time.Second,
+	recorder := newAPITestRecorder(t)
+	client := newTestClient(t, recorder.handler())
+
+	if err := client.RenameTorrent("test_hash_123", "New Torrent Name"); err != nil {
+		t.Fatalf("RenameTorrent returned error: %v", err)
+	}
+
+	recorder.assertCalls(t, []expectedCall{
+		{Path: "/api/v2/app/version", Method: http.MethodGet},
+		{Path: "/api/v2/auth/login", Method: http.MethodPost},
+		{
+			Path:   "/api/v2/torrents/rename",
+			Method: http.MethodPost,
+			Form: map[string]string{
+				"hash": "test_hash_123",
+				"name": "New Torrent Name",
+			},
+		},
 	})
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
-
-	// Test with valid parameters
-	hash := "test_hash_123"
-	newName := "New Torrent Name"
-
-	// This test will fail in real scenario without a running qBittorrent instance
-	// but it validates the method signature and basic structure
-	err = client.RenameTorrent(hash, newName)
-	if err != nil {
-		// Expected to fail without real qBittorrent instance
-		if !strings.Contains(err.Error(), "failed to rename torrent") {
-			t.Errorf("Unexpected error: %v", err)
-		}
-	}
 }
 
 func TestSuperSeedingMode(t *testing.T) {
-	client, err := New(Config{
-		BaseURL:        "http://localhost:8080",
-		Username:       "test",
-		Password:       "test",
-		RequestTimeout: 30 * time.Second,
+	recorder := newAPITestRecorder(t)
+	client := newTestClient(t, recorder.handler())
+
+	if err := client.SuperSeedingMode("test_hash_123", true); err != nil {
+		t.Fatalf("SuperSeedingMode(true) returned error: %v", err)
+	}
+	if err := client.SuperSeedingMode("test_hash_123", false); err != nil {
+		t.Fatalf("SuperSeedingMode(false) returned error: %v", err)
+	}
+
+	recorder.assertCalls(t, []expectedCall{
+		{Path: "/api/v2/app/version", Method: http.MethodGet},
+		{Path: "/api/v2/auth/login", Method: http.MethodPost},
+		{
+			Path:   "/api/v2/torrents/setSuperSeeding",
+			Method: http.MethodPost,
+			Form: map[string]string{
+				"hashes": "test_hash_123",
+				"value":  "true",
+			},
+		},
+		{
+			Path:   "/api/v2/torrents/setSuperSeeding",
+			Method: http.MethodPost,
+			Form: map[string]string{
+				"hashes": "test_hash_123",
+				"value":  "false",
+			},
+		},
 	})
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
-
-	// Test with valid parameters
-	hash := "test_hash_123"
-	enabled := true
-
-	// This test will fail in real scenario without a running qBittorrent instance
-	// but it validates the method signature and basic structure
-	err = client.SuperSeedingMode(hash, enabled)
-	if err != nil {
-		// Expected to fail without real qBittorrent instance
-		if !strings.Contains(err.Error(), "failed to set super seeding mode") {
-			t.Errorf("Unexpected error: %v", err)
-		}
-	}
-
-	// Test with disabled super seeding
-	err = client.SuperSeedingMode(hash, false)
-	if err != nil {
-		// Expected to fail without real qBittorrent instance
-		if !strings.Contains(err.Error(), "failed to set super seeding mode") {
-			t.Errorf("Unexpected error: %v", err)
-		}
-	}
 }
 
 func TestForceRecheck(t *testing.T) {
-	client, err := New(Config{
-		BaseURL:        "http://localhost:8080",
-		Username:       "test",
-		Password:       "test",
-		RequestTimeout: 30 * time.Second,
+	recorder := newAPITestRecorder(t)
+	client := newTestClient(t, recorder.handler())
+
+	if err := client.ForceRecheck("test_hash_123"); err != nil {
+		t.Fatalf("ForceRecheck returned error: %v", err)
+	}
+
+	recorder.assertCalls(t, []expectedCall{
+		{Path: "/api/v2/app/version", Method: http.MethodGet},
+		{Path: "/api/v2/auth/login", Method: http.MethodPost},
+		{
+			Path:   "/api/v2/torrents/recheck",
+			Method: http.MethodPost,
+			Form: map[string]string{
+				"hashes": "test_hash_123",
+			},
+		},
 	})
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
-
-	// Test with valid parameters
-	hash := "test_hash_123"
-
-	// This test will fail in real scenario without a running qBittorrent instance
-	// but it validates the method signature and basic structure
-	err = client.ForceRecheck(hash)
-	if err != nil {
-		// Expected to fail without real qBittorrent instance
-		if !strings.Contains(err.Error(), "failed to force recheck") {
-			t.Errorf("Unexpected error: %v", err)
-		}
-	}
 }
 
 func TestForceReannounce(t *testing.T) {
-	client, err := New(Config{
-		BaseURL:        "http://localhost:8080",
-		Username:       "test",
-		Password:       "test",
-		RequestTimeout: 30 * time.Second,
+	recorder := newAPITestRecorder(t)
+	client := newTestClient(t, recorder.handler())
+
+	if err := client.ForceReannounce("test_hash_123"); err != nil {
+		t.Fatalf("ForceReannounce returned error: %v", err)
+	}
+
+	recorder.assertCalls(t, []expectedCall{
+		{Path: "/api/v2/app/version", Method: http.MethodGet},
+		{Path: "/api/v2/auth/login", Method: http.MethodPost},
+		{
+			Path:   "/api/v2/torrents/reannounce",
+			Method: http.MethodPost,
+			Form: map[string]string{
+				"hashes": "test_hash_123",
+			},
+		},
 	})
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
-
-	// Test with valid parameters
-	hash := "test_hash_123"
-
-	// This test will fail in real scenario without a running qBittorrent instance
-	// but it validates the method signature and basic structure
-	err = client.ForceReannounce(hash)
-	if err != nil {
-		// Expected to fail without real qBittorrent instance
-		if !strings.Contains(err.Error(), "failed to force reannounce") {
-			t.Errorf("Unexpected error: %v", err)
-		}
-	}
 }
 
 func TestAlternativeRateLimits(t *testing.T) {
-	client, err := New(Config{
-		BaseURL:        "http://localhost:8080",
-		Username:       "test",
-		Password:       "test",
-		RequestTimeout: 30 * time.Second,
+	recorder := newAPITestRecorder(t)
+	client := newTestClient(t, recorder.handler())
+
+	if err := client.SetAlternativeRateLimits(2048*1024, 1024*1024); err != nil {
+		t.Fatalf("SetAlternativeRateLimits returned error: %v", err)
+	}
+
+	recorder.assertCalls(t, []expectedCall{
+		{Path: "/api/v2/app/version", Method: http.MethodGet},
+		{Path: "/api/v2/auth/login", Method: http.MethodPost},
+		{
+			Path:   "/api/v2/app/setPreferences",
+			Method: http.MethodPost,
+			JSONField: map[string]interface{}{
+				"alt_dl_limit": float64(2048 * 1024),
+				"alt_up_limit": float64(1024 * 1024),
+			},
+		},
 	})
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
-
-	// Test with valid parameters
-	downloadLimit := 2048 * 1024 // 2 MB/s
-	uploadLimit := 1024 * 1024   // 1 MB/s
-
-	// This test will fail in real scenario without a running qBittorrent instance
-	// but it validates the method signature and basic structure
-	err = client.SetAlternativeRateLimits(downloadLimit, uploadLimit)
-	if err != nil {
-		// Expected to fail without real qBittorrent instance
-		if !strings.Contains(err.Error(), "failed to get global settings") {
-			t.Errorf("Unexpected error: %v", err)
-		}
-	}
 }
 
 func TestAlternativeRateLimitsWithZeroValues(t *testing.T) {
-	client, err := New(Config{
-		BaseURL:        "http://localhost:8080",
-		Username:       "test",
-		Password:       "test",
-		RequestTimeout: 30 * time.Second,
-	})
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
+	recorder := newAPITestRecorder(t)
+	client := newTestClient(t, recorder.handler())
+
+	if err := client.SetAlternativeRateLimits(0, 0); err != nil {
+		t.Fatalf("SetAlternativeRateLimits with zero values returned error: %v", err)
 	}
 
-	// Test with zero values (should disable limits)
-	downloadLimit := 0
-	uploadLimit := 0
+	recorder.assertCalls(t, []expectedCall{
+		{Path: "/api/v2/app/version", Method: http.MethodGet},
+		{Path: "/api/v2/auth/login", Method: http.MethodPost},
+		{
+			Path:   "/api/v2/app/setPreferences",
+			Method: http.MethodPost,
+			JSONField: map[string]interface{}{
+				"alt_dl_limit": float64(0),
+				"alt_up_limit": float64(0),
+			},
+		},
+	})
+}
 
-	// This test will fail in real scenario without a running qBittorrent instance
-	// but it validates the method signature and basic structure
-	err = client.SetAlternativeRateLimits(downloadLimit, uploadLimit)
-	if err != nil {
-		// Expected to fail without real qBittorrent instance
-		if !strings.Contains(err.Error(), "failed to get global settings") {
-			t.Errorf("Unexpected error: %v", err)
-		}
+func TestSetAlternativeRateLimits_PropagatesSetPreferencesError(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	recorder.responses["/api/v2/app/setPreferences"] = endpointResponse{
+		statusCode: http.StatusBadRequest,
+		body:       "invalid rate limits",
+	}
+	client := newTestClient(t, recorder.handler())
+
+	err := client.SetAlternativeRateLimits(1, 2)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to set alternative rate limits") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+	if !strings.Contains(err.Error(), "invalid rate limits") {
+		t.Fatalf("expected response body in error, got %v", err)
 	}
 }
 
 func TestMaxActiveTorrentLimitsWithZeroValues(t *testing.T) {
-	client, err := New(Config{
-		BaseURL:        "http://localhost:8080",
-		Username:       "test",
-		Password:       "test",
-		RequestTimeout: 30 * time.Second,
-	})
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
+	recorder := newAPITestRecorder(t)
+	client := newTestClient(t, recorder.handler())
+
+	if err := client.SetMaxActiveTorrentLimits(0, 0, 0, -1); err != nil {
+		t.Fatalf("SetMaxActiveTorrentLimits returned error: %v", err)
 	}
 
-	// Test with zero values (should disable limits)
-	maxDownloads := 0
-	maxUploads := 0
-	maxTorrents := 0
-	maxChecking := -1
+	recorder.assertCalls(t, []expectedCall{
+		{Path: "/api/v2/app/version", Method: http.MethodGet},
+		{Path: "/api/v2/auth/login", Method: http.MethodPost},
+		{
+			Path:   "/api/v2/app/setPreferences",
+			Method: http.MethodPost,
+			JSONField: map[string]interface{}{
+				"max_active_downloads":         float64(0),
+				"max_active_uploads":           float64(0),
+				"max_active_torrents":          float64(0),
+				"max_active_checking_torrents": float64(-1),
+			},
+		},
+	})
+}
 
-	err = client.SetMaxActiveTorrentLimits(maxDownloads, maxUploads, maxTorrents, maxChecking)
-	if err != nil {
-		// Expected to fail without real qBittorrent instance
-		if !strings.Contains(err.Error(), "failed to get global settings") {
-			t.Errorf("Unexpected error: %v", err)
+func TestMaxActiveTorrentLimitsWithNegativeValues(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	client := newTestClient(t, recorder.handler())
+
+	if err := client.SetMaxActiveTorrentLimits(-1, -5, -10, -1); err != nil {
+		t.Fatalf("SetMaxActiveTorrentLimits with negative values returned error: %v", err)
+	}
+
+	recorder.assertCalls(t, []expectedCall{
+		{Path: "/api/v2/app/version", Method: http.MethodGet},
+		{Path: "/api/v2/auth/login", Method: http.MethodPost},
+		{
+			Path:   "/api/v2/app/setPreferences",
+			Method: http.MethodPost,
+			JSONField: map[string]interface{}{
+				"max_active_downloads":         float64(-1),
+				"max_active_uploads":           float64(-5),
+				"max_active_torrents":          float64(-10),
+				"max_active_checking_torrents": float64(-1),
+			},
+		},
+	})
+}
+
+func TestDoWithRetryUsesConfiguredRequestTimeout(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	recorder.responses["/api/v2/torrents/setLocation"] = endpointResponse{
+		delay:      150 * time.Millisecond,
+		statusCode: http.StatusOK,
+	}
+	client := newTestClient(t, recorder.handler())
+	client.config.RequestTimeout = 50 * time.Millisecond
+	client.client.Timeout = 50 * time.Millisecond
+	client.retryConfig.MaxRetries = 0
+
+	start := time.Now()
+	err := client.SetTorrentLocation("test_hash_123", "/slow/path")
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected timeout error, got nil")
+	}
+	if elapsed > 130*time.Millisecond {
+		t.Fatalf("expected request timeout to stop early, took %v", elapsed)
+	}
+}
+
+type expectedCall struct {
+	Path      string
+	Method    string
+	Form      map[string]string
+	JSONField map[string]interface{}
+}
+
+type endpointResponse struct {
+	statusCode int
+	body       string
+	delay      time.Duration
+	headers    map[string]string
+}
+
+type recordedCall struct {
+	Path   string
+	Method string
+	Form   url.Values
+}
+
+type apiTestRecorder struct {
+	t         *testing.T
+	calls     []recordedCall
+	responses map[string]endpointResponse
+}
+
+func newAPITestRecorder(t *testing.T) *apiTestRecorder {
+	return &apiTestRecorder{
+		t:         t,
+		responses: make(map[string]endpointResponse),
+	}
+}
+
+func (r *apiTestRecorder) handler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if err := req.ParseForm(); err != nil {
+			r.t.Fatalf("failed to parse form for %s: %v", req.URL.Path, err)
+		}
+
+		r.calls = append(r.calls, recordedCall{
+			Path:   req.URL.Path,
+			Method: req.Method,
+			Form:   req.PostForm,
+		})
+
+		switch req.URL.Path {
+		case "/api/v2/app/version":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("4.6.0"))
+			return
+		case "/api/v2/auth/login":
+			http.SetCookie(w, &http.Cookie{Name: "SID", Value: "cookie"})
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("Ok."))
+			return
+		}
+
+		resp, ok := r.responses[req.URL.Path]
+		if !ok {
+			resp = endpointResponse{statusCode: http.StatusOK}
+		}
+		if resp.delay > 0 {
+			time.Sleep(resp.delay)
+		}
+		for key, value := range resp.headers {
+			w.Header().Set(key, value)
+		}
+		if resp.statusCode == 0 {
+			resp.statusCode = http.StatusOK
+		}
+		w.WriteHeader(resp.statusCode)
+		if resp.body != "" {
+			_, _ = w.Write([]byte(resp.body))
+		}
+	})
+}
+
+func (r *apiTestRecorder) assertCalls(t *testing.T, expected []expectedCall) {
+	t.Helper()
+
+	if len(r.calls) != len(expected) {
+		t.Fatalf("expected %d calls, got %d", len(expected), len(r.calls))
+	}
+
+	for i, want := range expected {
+		got := r.calls[i]
+		if got.Path != want.Path {
+			t.Fatalf("call %d path: expected %s, got %s", i, want.Path, got.Path)
+		}
+		if got.Method != want.Method {
+			t.Fatalf("call %d method: expected %s, got %s", i, want.Method, got.Method)
+		}
+		for key, value := range want.Form {
+			if got.Form.Get(key) != value {
+				t.Fatalf("call %d form %s: expected %s, got %s", i, key, value, got.Form.Get(key))
+			}
+		}
+		if want.JSONField != nil {
+			raw := got.Form.Get("json")
+			if raw == "" {
+				t.Fatalf("call %d expected json field, got empty form", i)
+			}
+			var decoded map[string]interface{}
+			if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
+				t.Fatalf("call %d invalid json payload: %v", i, err)
+			}
+			for key, value := range want.JSONField {
+				if decoded[key] != value {
+					t.Fatalf("call %d json %s: expected %v, got %v", i, key, value, decoded[key])
+				}
+			}
 		}
 	}
 }
 
-func TestMaxActiveTorrentLimitsWithNegativeValues(t *testing.T) {
+func newTestClient(t *testing.T, handler http.Handler) *Client {
+	t.Helper()
+
+	server := newIPv4TestServer(t, handler)
+	t.Cleanup(server.Close)
+
 	client, err := New(Config{
-		BaseURL:        "http://localhost:8080",
+		BaseURL:        server.URL,
 		Username:       "test",
 		Password:       "test",
-		RequestTimeout: 30 * time.Second,
+		RequestTimeout: 200 * time.Millisecond,
+		MaxRetries:     0,
+		RetryBackoff:   5 * time.Millisecond,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create client: %v", err)
 	}
 
-	// Test with negative values (should be handled gracefully)
-	maxDownloads := -1
-	maxUploads := -5
-	maxTorrents := -10
-	maxChecking := -1
+	t.Cleanup(func() {
+		client.invalidateCookies()
+	})
 
-	err = client.SetMaxActiveTorrentLimits(maxDownloads, maxUploads, maxTorrents, maxChecking)
+	return client
+}
+
+func newIPv4TestServer(t *testing.T, handler http.Handler) *httptest.Server {
+	t.Helper()
+
+	listener, err := net.Listen("tcp4", "127.0.0.1:0")
 	if err != nil {
-		// Expected to fail without real qBittorrent instance
-		if !strings.Contains(err.Error(), "failed to get global settings") {
-			t.Errorf("Unexpected error: %v", err)
-		}
+		t.Fatalf("failed to listen on test port: %v", err)
 	}
+
+	server := httptest.NewUnstartedServer(handler)
+	server.Listener = listener
+	server.Start()
+	return server
 }

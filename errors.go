@@ -200,6 +200,16 @@ func classifyOpError(opErr *net.OpError, originalErr error) *ClientError {
 func classifyByMessage(errStr string, err error) *ClientError {
 	lowerErr := strings.ToLower(errStr)
 
+	// Authentication patterns
+	if isAuthenticationError(lowerErr) {
+		return NewClientError(
+			ErrorCodeAuthFailure,
+			"Invalid username or password",
+			err,
+			true,
+		)
+	}
+
 	// Timeout patterns
 	if strings.Contains(lowerErr, "timeout") ||
 		strings.Contains(lowerErr, "deadline exceeded") ||
@@ -253,22 +263,6 @@ func classifyByMessage(errStr string, err error) *ClientError {
 		return NewClientError(
 			ErrorCodeDNS,
 			"DNS resolution failed - check hostname",
-			err,
-			true,
-		)
-	}
-
-	// Authentication patterns
-	// "Fails." is the specific message from qBittorrent API for invalid credentials
-	if strings.Contains(lowerErr, "fails.") ||
-		strings.Contains(lowerErr, "unauthorized") ||
-		strings.Contains(lowerErr, "authentication failed") ||
-		strings.Contains(lowerErr, "invalid username") ||
-		strings.Contains(lowerErr, "invalid password") ||
-		strings.Contains(lowerErr, "invalid credentials") {
-		return NewClientError(
-			ErrorCodeAuthFailure,
-			"Invalid username or password",
 			err,
 			true,
 		)
@@ -370,4 +364,15 @@ func GetErrorCode(err error) ErrorCode {
 	// Classify and return code
 	classified := ClassifyError(err)
 	return classified.Code
+}
+
+func isAuthenticationError(lowerErr string) bool {
+	return strings.Contains(lowerErr, "fails.") ||
+		strings.Contains(lowerErr, "unauthorized") ||
+		strings.Contains(lowerErr, "authentication failed") ||
+		strings.Contains(lowerErr, "authentication error") ||
+		strings.Contains(lowerErr, "auth failed") ||
+		strings.Contains(lowerErr, "invalid username") ||
+		strings.Contains(lowerErr, "invalid password") ||
+		strings.Contains(lowerErr, "invalid credentials")
 }
