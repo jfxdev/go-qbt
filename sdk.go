@@ -34,6 +34,7 @@ func (qb *Client) doWithRetry(method, endpoint string, body []byte, headers map[
 			request.WithBody(bodyReader),
 			request.WithHeaders(headers),
 			request.WithCookieJar(qb.config.jar),
+			request.WithTimeoutDuration(qb.config.RequestTimeout),
 		)
 
 		if err != nil {
