@@ -228,6 +228,26 @@ func (qb *Client) DeleteTorrentTags(hash string, tags []string) error {
 }
 
 func (qb *Client) SetCategory(hash string, category string) error {
+	method, endpoint, body, headers := buildCategoryRequest(qb.config.BaseURL, hash, category)
+
+	resp, err := qb.doWithRetry(method, endpoint, body, headers)
+	if err != nil {
+		return fmt.Errorf("failed to set category: %w", err)
+	}
+	return handleCategoryResponse(resp, "set category for torrent")
+}
+
+func (qb *Client) RemoveCategory(hash string) error {
+	method, endpoint, body, headers := buildCategoryRequest(qb.config.BaseURL, hash, "")
+
+	resp, err := qb.doWithRetry(method, endpoint, body, headers)
+	if err != nil {
+		return fmt.Errorf("failed to remove category: %w", err)
+	}
+	return handleCategoryResponse(resp, "remove category from torrent")
+}
+
+func buildCategoryRequest(baseURL, hash, category string) (string, string, []byte, map[string]string) {
 	data := url.Values{
 		"hashes":   {hash},
 		"category": {category},
@@ -237,43 +257,16 @@ func (qb *Client) SetCategory(hash string, category string) error {
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
 
-	endpoint := fmt.Sprintf("%s/api/v2/torrents/setCategory", qb.config.BaseURL)
-
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
-	if err != nil {
-		return fmt.Errorf("failed to set category: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to set category for torrent. Status: %d, Response: %s", resp.StatusCode, body)
-	}
-
-	return nil
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/setCategory", baseURL)
+	return http.MethodPost, endpoint, []byte(data.Encode()), headers
 }
 
-func (qb *Client) RemoveCategory(hash string) error {
-	data := url.Values{
-		"hashes":   {hash},
-		"category": {""}, // Empty category removes the category
-	}
-
-	headers := map[string]string{
-		"Content-Type": "application/x-www-form-urlencoded",
-	}
-
-	endpoint := fmt.Sprintf("%s/api/v2/torrents/setCategory", qb.config.BaseURL)
-
-	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
-	if err != nil {
-		return fmt.Errorf("failed to remove category: %w", err)
-	}
+func handleCategoryResponse(resp *http.Response, action string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to remove category from torrent. Status: %d, Response: %s", resp.StatusCode, body)
+		return fmt.Errorf("failed to %s. Status: %d, Response: %s", action, resp.StatusCode, body)
 	}
 
 	return nil
