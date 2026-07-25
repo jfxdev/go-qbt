@@ -50,6 +50,8 @@ func New(config Config) (*Client, error) {
 
 	config.jar = jar
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	client := &Client{
 		config:          config,
 		client:          &http.Client{Jar: jar, Timeout: config.RequestTimeout},
@@ -61,6 +63,9 @@ func New(config Config) (*Client, error) {
 		cookieValid:     false,
 		status:          StatusInitializing,
 		authFailed:      false,
+		stopCh:          make(chan struct{}),
+		ctx:             ctx,
+		cancel:          cancel,
 	}
 
 	// Start periodic cookie cleanup routine
@@ -182,7 +187,7 @@ func (qb *Client) loginWithContext(ctx context.Context) error {
 	body, _ := io.ReadAll(resp.Body)
 	bodyStr := strings.TrimSpace(string(body))
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		clientErr := classifyHTTPStatusCode(resp.StatusCode, bodyStr)
 		qb.SetLastError(clientErr)
 		return clientErr
@@ -253,7 +258,7 @@ func (qb *Client) isCookieValid() bool {
 	}
 
 	// Do a lightweight validation request only if required
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(qb.ctx, 5*time.Second)
 	defer cancel()
 
 	resp, err := request.Do(http.MethodGet,
@@ -540,23 +545,42 @@ func (qb *Client) startCookieCleanup() {
 	ticker := time.NewTicker(CookieCheckInterval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		if qb.isCookieExpired() {
-			qb.setCookieValid(false)
-			qb.cookieCache.clear()
-			// Do NOT change status to StatusUnauthorized here.
-			// Cookie expiry is a normal lifecycle event — the next API call
-			// will trigger re-authentication via ensureLoginWithContext.
-			// Setting StatusUnauthorized here caused stale "auth failed" reports
-			// when the health endpoint read cached status.
-			if qb.config.Debug {
-				log.Println("Cookies expired, cleared from cache — next request will re-authenticate")
+	for {
+		select {
+		case <-qb.stopCh:
+			return
+		case <-ticker.C:
+			if qb.isCookieExpired() {
+				qb.setCookieValid(false)
+				qb.cookieCache.clear()
+				// Do NOT change status to StatusUnauthorized here.
+				// Cookie expiry is a normal lifecycle event — the next API call
+				// will trigger re-authentication via ensureLoginWithContext.
+				// Setting StatusUnauthorized here caused stale "auth failed" reports
+				// when the health endpoint read cached status.
+				if qb.config.Debug {
+					log.Println("Cookies expired, cleared from cache — next request will re-authenticate")
+				}
 			}
 		}
 	}
 }
 
+// Cancel aborts every in-flight and future request issued through this
+// client immediately, without waiting for a graceful logout. Safe to call
+// multiple times. Use this when the worker is being deleted or reconfigured
+// and stale requests must not keep hitting the old instance.
+func (qb *Client) Cancel() {
+	qb.cancel()
+}
+
+// Close stops background goroutines (cookie cleanup) and logs out of the
+// qBittorrent session. It is safe to call multiple times.
 func (qb *Client) Close() error {
+	qb.stopOnce.Do(func() {
+		close(qb.stopCh)
+	})
+
 	// If client is not fully configured, just clear cache
 	if qb.config.BaseURL == "" || qb.config.jar == nil {
 		qb.invalidateCookies()

@@ -2,25 +2,26 @@ package qbt
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 
 	"github.com/jfxdev/go-qbt/request"
 )
 
-// Helper to perform requests with automatic retry
+// Helper to perform requests with automatic retry. All requests derive from
+// the client's lifecycle context (qb.ctx), so Cancel() aborts them
+// immediately - e.g. when the worker backing this client is deleted or its
+// credentials change mid-request.
 func (qb *Client) doWithRetry(method, endpoint string, body []byte, headers map[string]string) (*http.Response, error) {
 	var resp *http.Response
 	var err error
 
-	// Use a simple retry without context to avoid cancellation issues
-	err = qb.retryWithBackoff(func() error {
-		// Ensure we are logged in using context.Background() to avoid cancellation
-		if err := qb.ensureLoginWithContext(context.Background()); err != nil {
+	err = qb.retryWithBackoffWithContext(qb.ctx, func() error {
+		if err := qb.ensureLoginWithContext(qb.ctx); err != nil {
 			return fmt.Errorf("failed to ensure login: %w", err)
 		}
 
@@ -29,11 +30,11 @@ func (qb *Client) doWithRetry(method, endpoint string, body []byte, headers map[
 			bodyReader = bytes.NewReader(body)
 		}
 
-		// Perform the request without context to avoid cancellation issues
 		resp, err = request.Do(method, endpoint,
 			request.WithBody(bodyReader),
 			request.WithHeaders(headers),
 			request.WithCookieJar(qb.config.jar),
+			request.WithContext(qb.ctx),
 			request.WithTimeoutDuration(qb.config.RequestTimeout),
 		)
 
@@ -120,6 +121,65 @@ func (qb *Client) AddTorrentLink(opts TorrentConfig) error {
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to add torrent. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
+// AddTorrentFile adds a torrent from a .torrent file's raw bytes via
+// multipart/form-data, mirroring AddTorrentLink's options.
+func (qb *Client) AddTorrentFile(opts TorrentFileConfig) error {
+	if len(opts.FileData) == 0 {
+		return fmt.Errorf("torrent file data is empty")
+	}
+
+	fileName := opts.FileName
+	if fileName == "" {
+		fileName = "upload.torrent"
+	}
+
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+
+	part, err := writer.CreateFormFile("torrents", fileName)
+	if err != nil {
+		return fmt.Errorf("failed to create multipart file field: %w", err)
+	}
+	if _, err := part.Write(opts.FileData); err != nil {
+		return fmt.Errorf("failed to write torrent file data: %w", err)
+	}
+
+	fields := map[string]string{
+		"savepath":      opts.Directory,
+		"category":      opts.Category,
+		"paused":        fmt.Sprintf("%v", opts.Paused),
+		"skip_checking": fmt.Sprintf("%v", opts.SkipChecking),
+	}
+	for key, value := range fields {
+		if err := writer.WriteField(key, value); err != nil {
+			return fmt.Errorf("failed to write multipart field %q: %w", key, err)
+		}
+	}
+
+	if err := writer.Close(); err != nil {
+		return fmt.Errorf("failed to finalize multipart body: %w", err)
+	}
+
+	headers := map[string]string{
+		"Content-Type": writer.FormDataContentType(),
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/add", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, buf.Bytes(), headers)
+	if err != nil {
+		return fmt.Errorf("failed to add torrent file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to add torrent file. Status: %d, Response: %s", resp.StatusCode, body)
 	}
 
 	return nil

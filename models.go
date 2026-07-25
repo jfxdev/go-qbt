@@ -1,6 +1,7 @@
 package qbt
 
 import (
+	"context"
 	"net/http"
 	"net/http/cookiejar"
 	"sync"
@@ -49,6 +50,17 @@ type Client struct {
 	// Consecutive login failure counter (threshold before authFailed is set)
 	loginFailCount   int
 	loginFailCountMu sync.Mutex
+
+	// Lifecycle control for background goroutines (e.g. cookie cleanup)
+	stopOnce sync.Once
+	stopCh   chan struct{}
+
+	// ctx is the client's lifecycle context. Every outgoing request derives
+	// its context from this one, so Cancel() aborts in-flight requests
+	// immediately (e.g. when the worker is deleted or its credentials
+	// change mid-request).
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 // Config contains runtime client settings and credentials.
@@ -94,6 +106,16 @@ type ListFilter struct {
 // TorrentConfig configures new torrent creation.
 type TorrentConfig struct {
 	MagnetURI    string
+	Directory    string
+	Category     string
+	Paused       bool
+	SkipChecking bool
+}
+
+// TorrentFileConfig configures adding a torrent from a .torrent file's raw bytes.
+type TorrentFileConfig struct {
+	FileName     string
+	FileData     []byte
 	Directory    string
 	Category     string
 	Paused       bool
