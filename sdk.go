@@ -871,12 +871,28 @@ func (qb *Client) GetTags() ([]string, error) {
 	return tags, nil
 }
 
+// validateTagNames rejects tag names that would corrupt the comma-separated
+// "tags" field CreateTags and DeleteTags send to qBittorrent: a comma inside
+// a name is indistinguishable from a separator between two names, so e.g.
+// "movies,4k" sent as a single tag would silently become two.
+func validateTagNames(tags []string) error {
+	for _, tag := range tags {
+		if strings.Contains(tag, ",") {
+			return fmt.Errorf("invalid tag name %q: tag names must not contain a comma", tag)
+		}
+	}
+	return nil
+}
+
 // CreateTags creates one or more tags on the server without attaching them
 // to any torrent. A tag name may not contain a comma, since tags are sent
 // to qBittorrent as a single comma-separated field.
 func (qb *Client) CreateTags(tags []string) error {
 	if len(tags) == 0 {
 		return nil
+	}
+	if err := validateTagNames(tags); err != nil {
+		return err
 	}
 
 	data := url.Values{
@@ -909,6 +925,9 @@ func (qb *Client) CreateTags(tags []string) error {
 func (qb *Client) DeleteTags(tags []string) error {
 	if len(tags) == 0 {
 		return nil
+	}
+	if err := validateTagNames(tags); err != nil {
+		return err
 	}
 
 	data := url.Values{

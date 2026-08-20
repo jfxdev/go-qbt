@@ -518,6 +518,21 @@ func TestCreateTags_EmptyIsNoop(t *testing.T) {
 	recorder.assertCalls(t, []expectedCall{})
 }
 
+func TestCreateTags_RejectsCommaInName(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	client := newTestClient(t, recorder.handler())
+
+	err := client.CreateTags([]string{"movies,4k"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "movies,4k") {
+		t.Fatalf("expected error to name the offending tag, got: %v", err)
+	}
+
+	recorder.assertCalls(t, []expectedCall{})
+}
+
 func TestCreateTags_PropagatesHTTPError(t *testing.T) {
 	recorder := newAPITestRecorder(t)
 	recorder.responses["/api/v2/torrents/createTags"] = endpointResponse{
@@ -565,6 +580,21 @@ func TestDeleteTags_EmptyIsNoop(t *testing.T) {
 
 	if err := client.DeleteTags(nil); err != nil {
 		t.Fatalf("DeleteTags returned error: %v", err)
+	}
+
+	recorder.assertCalls(t, []expectedCall{})
+}
+
+func TestDeleteTags_RejectsCommaInName(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	client := newTestClient(t, recorder.handler())
+
+	err := client.DeleteTags([]string{"movies,4k"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "movies,4k") {
+		t.Fatalf("expected error to name the offending tag, got: %v", err)
 	}
 
 	recorder.assertCalls(t, []expectedCall{})
