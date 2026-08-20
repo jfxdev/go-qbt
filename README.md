@@ -127,6 +127,11 @@ if err != nil {
 - `CreateCategory(name, savePath string)` - Create new category
 - `DeleteCategory(name string)` - Delete category
 
+### Tags Management
+- `GetTags()` - Get all tags registered on the server, including tags not attached to any torrent
+- `CreateTags(tags []string)` - Create one or more tags without attaching them to any torrent
+- `DeleteTags(tags []string)` - Delete one or more tags, detaching them from every torrent that carries them
+
 ### Global Settings & Configuration
 - `GetGlobalSettings()` - Get global qBittorrent settings
 - `SetGlobalSettings(settings GlobalSettings)` - Set global qBittorrent settings
@@ -209,6 +214,18 @@ if err != nil {
 err = client.CreateCategory("movies", "/downloads/movies")
 if err != nil {
     log.Printf("Error creating category: %v", err)
+}
+
+// Create a tag ahead of time, without attaching it to any torrent
+err = client.CreateTags([]string{"4k"})
+if err != nil {
+    log.Printf("Error creating tag: %v", err)
+}
+
+// List every tag registered on the server
+tags, err := client.GetTags()
+if err != nil {
+    log.Printf("Error getting tags: %v", err)
 }
 ```
 

@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/jfxdev/go-qbt/request"
 )
@@ -837,6 +838,117 @@ func (qb *Client) DeleteCategory(name string) error {
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to delete category. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
+// GetTags returns all tags registered on the server, including tags that
+// are not currently attached to any torrent.
+func (qb *Client) GetTags() ([]string, error) {
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/tags", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodGet, endpoint, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tags: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get tags. Status: %d, Response: %s", resp.StatusCode, string(body))
+	}
+
+	var tags []string
+	if err := json.Unmarshal(body, &tags); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return tags, nil
+}
+
+// validateTagNames rejects tag names that would corrupt the comma-separated
+// "tags" field CreateTags and DeleteTags send to qBittorrent: a comma inside
+// a name is indistinguishable from a separator between two names, so e.g.
+// "movies,4k" sent as a single tag would silently become two.
+func validateTagNames(tags []string) error {
+	for _, tag := range tags {
+		if strings.Contains(tag, ",") {
+			return fmt.Errorf("invalid tag name %q: tag names must not contain a comma", tag)
+		}
+	}
+	return nil
+}
+
+// CreateTags creates one or more tags on the server without attaching them
+// to any torrent. A tag name may not contain a comma, since tags are sent
+// to qBittorrent as a single comma-separated field.
+func (qb *Client) CreateTags(tags []string) error {
+	if len(tags) == 0 {
+		return nil
+	}
+	if err := validateTagNames(tags); err != nil {
+		return err
+	}
+
+	data := url.Values{
+		"tags": {strings.Join(tags, ",")},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/createTags", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to create tags: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to create tags. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
+// DeleteTags removes one or more tags from the server, detaching them from
+// every torrent that carries them. Deleting a tag that does not exist is a
+// no-op on qBittorrent's side.
+func (qb *Client) DeleteTags(tags []string) error {
+	if len(tags) == 0 {
+		return nil
+	}
+	if err := validateTagNames(tags); err != nil {
+		return err
+	}
+
+	data := url.Values{
+		"tags": {strings.Join(tags, ",")},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/deleteTags", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to delete tags: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to delete tags. Status: %d, Response: %s", resp.StatusCode, body)
 	}
 
 	return nil
