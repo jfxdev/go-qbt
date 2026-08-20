@@ -437,6 +437,159 @@ func TestRenameTorrent(t *testing.T) {
 	})
 }
 
+func TestGetTags(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	recorder.responses["/api/v2/torrents/tags"] = endpointResponse{
+		body: `["movies","4k","genre::action"]`,
+	}
+	client := newTestClient(t, recorder.handler())
+
+	tags, err := client.GetTags()
+	if err != nil {
+		t.Fatalf("GetTags returned error: %v", err)
+	}
+
+	want := []string{"movies", "4k", "genre::action"}
+	if len(tags) != len(want) {
+		t.Fatalf("expected %d tags, got %d (%v)", len(want), len(tags), tags)
+	}
+	for i, tag := range want {
+		if tags[i] != tag {
+			t.Fatalf("tag %d: expected %s, got %s", i, tag, tags[i])
+		}
+	}
+
+	recorder.assertCalls(t, []expectedCall{
+		{Path: "/api/v2/app/version", Method: http.MethodGet},
+		{Path: "/api/v2/auth/login", Method: http.MethodPost},
+		{Path: "/api/v2/torrents/tags", Method: http.MethodGet},
+	})
+}
+
+func TestGetTags_PropagatesHTTPError(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	recorder.responses["/api/v2/torrents/tags"] = endpointResponse{
+		statusCode: http.StatusBadRequest,
+		body:       "boom",
+	}
+	client := newTestClient(t, recorder.handler())
+
+	_, err := client.GetTags()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to get tags") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+	if !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("expected response body in error, got %v", err)
+	}
+}
+
+func TestCreateTags(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	client := newTestClient(t, recorder.handler())
+
+	if err := client.CreateTags([]string{"movies", "4k"}); err != nil {
+		t.Fatalf("CreateTags returned error: %v", err)
+	}
+
+	recorder.assertCalls(t, []expectedCall{
+		{Path: "/api/v2/app/version", Method: http.MethodGet},
+		{Path: "/api/v2/auth/login", Method: http.MethodPost},
+		{
+			Path:   "/api/v2/torrents/createTags",
+			Method: http.MethodPost,
+			Form: map[string]string{
+				"tags": "movies,4k",
+			},
+		},
+	})
+}
+
+func TestCreateTags_EmptyIsNoop(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	client := newTestClient(t, recorder.handler())
+
+	if err := client.CreateTags(nil); err != nil {
+		t.Fatalf("CreateTags returned error: %v", err)
+	}
+
+	recorder.assertCalls(t, []expectedCall{})
+}
+
+func TestCreateTags_PropagatesHTTPError(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	recorder.responses["/api/v2/torrents/createTags"] = endpointResponse{
+		statusCode: http.StatusBadRequest,
+		body:       "invalid tag",
+	}
+	client := newTestClient(t, recorder.handler())
+
+	err := client.CreateTags([]string{"movies"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to create tags") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+	if !strings.Contains(err.Error(), "invalid tag") {
+		t.Fatalf("expected response body in error, got %v", err)
+	}
+}
+
+func TestDeleteTags(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	client := newTestClient(t, recorder.handler())
+
+	if err := client.DeleteTags([]string{"movies", "4k"}); err != nil {
+		t.Fatalf("DeleteTags returned error: %v", err)
+	}
+
+	recorder.assertCalls(t, []expectedCall{
+		{Path: "/api/v2/app/version", Method: http.MethodGet},
+		{Path: "/api/v2/auth/login", Method: http.MethodPost},
+		{
+			Path:   "/api/v2/torrents/deleteTags",
+			Method: http.MethodPost,
+			Form: map[string]string{
+				"tags": "movies,4k",
+			},
+		},
+	})
+}
+
+func TestDeleteTags_EmptyIsNoop(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	client := newTestClient(t, recorder.handler())
+
+	if err := client.DeleteTags(nil); err != nil {
+		t.Fatalf("DeleteTags returned error: %v", err)
+	}
+
+	recorder.assertCalls(t, []expectedCall{})
+}
+
+func TestDeleteTags_PropagatesHTTPError(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	recorder.responses["/api/v2/torrents/deleteTags"] = endpointResponse{
+		statusCode: http.StatusBadRequest,
+		body:       "boom",
+	}
+	client := newTestClient(t, recorder.handler())
+
+	err := client.DeleteTags([]string{"movies"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to delete tags") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+	if !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("expected response body in error, got %v", err)
+	}
+}
+
 func TestSuperSeedingMode(t *testing.T) {
 	recorder := newAPITestRecorder(t)
 	client := newTestClient(t, recorder.handler())
