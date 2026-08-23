@@ -366,6 +366,24 @@ type RSSFeed struct {
 	Articles  []RSSArticle `json:"articles"`  // Articles
 }
 
+// RSSRule represents an RSS auto-downloading rule definition
+type RSSRule struct {
+	Enabled                   bool     `json:"enabled"`                        // Whether the rule is enabled
+	MustContain               string   `json:"mustContain"`                    // The substring that the torrent name must contain
+	MustNotContain            string   `json:"mustNotContain"`                 // The substring that the torrent name must not contain
+	UseRegex                  bool     `json:"useRegex"`                       // Whether mustContain/mustNotContain are treated as regular expressions
+	EpisodeFilter             string   `json:"episodeFilter"`                  // Episode filter definition
+	SmartFilter               bool     `json:"smartFilter"`                    // Whether smart episode filter is enabled
+	PreviouslyMatchedEpisodes []string `json:"previouslyMatchedEpisodes"`      // Episodes already matched by this rule
+	AffectedFeeds             []string `json:"affectedFeeds"`                  // Feed URLs this rule applies to
+	IgnoreDays                int      `json:"ignoreDays"`                     // Number of days to ignore already matched episodes
+	LastMatch                 string   `json:"lastMatch"`                      // Date/time the rule last matched
+	AddPaused                 bool     `json:"addPaused"`                      // Whether matched torrents are added paused
+	AssignedCategory          string   `json:"assignedCategory"`               // Category assigned to matched torrents
+	SavePath                  string   `json:"savePath"`                       // Save path for matched torrents
+	TorrentContentLayout      string   `json:"torrentContentLayout,omitempty"` // Content layout for matched torrents
+}
+
 // RSSArticle represents an RSS article
 type RSSArticle struct {
 	ID          string `json:"id"`          // Article ID
