@@ -90,6 +90,35 @@ func (qb *Client) RemoveRSSFeed(path string) error {
 	return nil
 }
 
+// SetRSSFeedURL changes an existing RSS feed's URL in place. Requires
+// qBittorrent 4.6.0+ (WebAPI v2.9.1+); on older servers, remove the feed
+// with RemoveRSSFeed and re-add it with AddRSSFeed instead.
+func (qb *Client) SetRSSFeedURL(path, feedURL string) error {
+	data := url.Values{
+		"path": {path},
+		"url":  {feedURL},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/rss/setFeedURL", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to set RSS feed URL: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to set RSS feed URL. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
 // AddRSSFolder adds a new RSS folder
 func (qb *Client) AddRSSFolder(path string) error {
 	data := url.Values{

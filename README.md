@@ -163,6 +163,7 @@ if err != nil {
 - `GetRSSFeeds(withData bool)` - Get RSS feeds
 - `AddRSSFeed(url, path string)` - Add RSS feed
 - `RemoveRSSFeed(path string)` - Remove RSS feed
+- `SetRSSFeedURL(path, url string)` - Change an existing RSS feed's URL in place (requires qBittorrent 4.6.0+ / WebAPI v2.9.1+)
 - `AddRSSFolder(path string)` - Add RSS folder
 - `MoveRSSItem(itemPath, destPath string)` - Move or rename an RSS feed/folder
 - `RefreshRSSItem(itemPath string)` - Force an immediate refresh of an RSS feed/folder
@@ -173,7 +174,7 @@ if err != nil {
 - `RemoveRSSRule(ruleName string)` - Remove an RSS auto-downloading rule
 - `GetMatchingRSSArticles(ruleName string)` - Preview which articles a rule currently matches, grouped by feed name
 
-> Note: qBittorrent 4.6.0+ (WebAPI v2.9.1+) added `POST rss/setFeedURL` to edit a feed's URL in place, but go-qbt does not wrap it yet. On older servers, or until that method is added, change a feed's URL by removing it with `RemoveRSSFeed` and re-adding it with `AddRSSFeed`.
+> Note: `SetRSSFeedURL` requires qBittorrent 4.6.0+ (WebAPI v2.9.1+). On older servers, change a feed's URL by removing it with `RemoveRSSFeed` and re-adding it with `AddRSSFeed`.
 
 ## 🌱 Essential Features for Seedbox
 

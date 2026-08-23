@@ -56,6 +56,48 @@ func TestHandleCategoryResponse_PropagatesHTTPError(t *testing.T) {
 	}
 }
 
+func TestSetRSSFeedURL(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	client := newTestClient(t, recorder.handler())
+
+	if err := client.SetRSSFeedURL("/Shows/feed", "http://example.com/new-feed"); err != nil {
+		t.Fatalf("SetRSSFeedURL returned error: %v", err)
+	}
+
+	recorder.assertCalls(t, []expectedCall{
+		{Path: "/api/v2/app/version", Method: http.MethodGet},
+		{Path: "/api/v2/auth/login", Method: http.MethodPost},
+		{
+			Path:   "/api/v2/rss/setFeedURL",
+			Method: http.MethodPost,
+			Form: map[string]string{
+				"path": "/Shows/feed",
+				"url":  "http://example.com/new-feed",
+			},
+		},
+	})
+}
+
+func TestSetRSSFeedURL_PropagatesHTTPError(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	recorder.responses["/api/v2/rss/setFeedURL"] = endpointResponse{
+		statusCode: http.StatusBadRequest,
+		body:       "url rejected",
+	}
+	client := newTestClient(t, recorder.handler())
+
+	err := client.SetRSSFeedURL("/Shows/feed", "http://example.com/new-feed")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to set RSS feed URL") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+	if !strings.Contains(err.Error(), "url rejected") {
+		t.Fatalf("expected response body in error, got %v", err)
+	}
+}
+
 func TestAddRSSFolder(t *testing.T) {
 	recorder := newAPITestRecorder(t)
 	client := newTestClient(t, recorder.handler())
