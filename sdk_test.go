@@ -365,7 +365,7 @@ func TestRemoveRSSRule_PropagatesHTTPError(t *testing.T) {
 func TestGetMatchingRSSArticles(t *testing.T) {
 	recorder := newAPITestRecorder(t)
 	recorder.responses["/api/v2/rss/matchingArticles"] = endpointResponse{
-		body: `{"http://example.com/feed":["Article One","Article Two"]}`,
+		body: `{"Linux Distros":["Article One","Article Two"]}`,
 	}
 	client := newTestClient(t, recorder.handler())
 
@@ -374,7 +374,7 @@ func TestGetMatchingRSSArticles(t *testing.T) {
 		t.Fatalf("GetMatchingRSSArticles returned error: %v", err)
 	}
 
-	articles, ok := matches["http://example.com/feed"]
+	articles, ok := matches["Linux Distros"]
 	if !ok || len(articles) != 2 {
 		t.Fatalf("unexpected matches: %v", matches)
 	}

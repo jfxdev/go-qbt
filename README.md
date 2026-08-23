@@ -171,9 +171,9 @@ if err != nil {
 - `SetRSSRule(ruleName string, rule RSSRule)` - Create or update an RSS auto-downloading rule
 - `RenameRSSRule(ruleName, newRuleName string)` - Rename an RSS auto-downloading rule
 - `RemoveRSSRule(ruleName string)` - Remove an RSS auto-downloading rule
-- `GetMatchingRSSArticles(ruleName string)` - Preview which articles a rule currently matches, grouped by feed URL
+- `GetMatchingRSSArticles(ruleName string)` - Preview which articles a rule currently matches, grouped by feed name
 
-> Note: qBittorrent has no endpoint to edit a feed's URL in place. To change a feed's URL, remove it with `RemoveRSSFeed` and re-add it with `AddRSSFeed`.
+> Note: qBittorrent 4.6.0+ (WebAPI v2.9.1+) added `POST rss/setFeedURL` to edit a feed's URL in place, but go-qbt does not wrap it yet. On older servers, or until that method is added, change a feed's URL by removing it with `RemoveRSSFeed` and re-adding it with `AddRSSFeed`.
 
 ## 🌱 Essential Features for Seedbox
 

@@ -312,7 +312,7 @@ func (qb *Client) RemoveRSSRule(ruleName string) error {
 }
 
 // GetMatchingRSSArticles previews which articles an RSS rule would currently
-// match, grouped by feed URL.
+// match, grouped by feed name.
 func (qb *Client) GetMatchingRSSArticles(ruleName string) (map[string][]string, error) {
 	params := url.Values{}
 	params.Add("ruleName", ruleName)
