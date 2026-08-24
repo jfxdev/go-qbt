@@ -176,6 +176,12 @@ if err != nil {
 
 > Note: `SetRSSFeedURL` requires qBittorrent 4.6.0+ (WebAPI v2.9.1+). On older servers, change a feed's URL by removing it with `RemoveRSSFeed` and re-adding it with `AddRSSFeed`.
 
+### Tracker Management
+- `GetTorrentTrackers(hash string)` - Get torrent tracker information
+- `AddTrackers(hash string, urls []string)` - Add one or more trackers to a torrent (a no-op for trackers already present)
+- `RemoveTrackers(hash string, urls []string)` - Remove one or more trackers from a torrent (a no-op for trackers not present)
+- `EditTracker(hash, origURL, newURL string)` - Swap a tracker's URL in place, preserving per-tracker state (like tier) that remove+add would lose
+
 ## 🌱 Essential Features for Seedbox
 
 This SDK has been specially optimized for seedbox usage, including essential features for daily management:
