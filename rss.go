@@ -8,7 +8,11 @@ import (
 	"net/url"
 )
 
-// GetRSSFeeds gets configured RSS feeds
+// GetRSSFeeds gets configured RSS feeds. qBittorrent's rss/items response is
+// a recursive tree of feeds and folders; feeds nested inside folders are
+// returned keyed by their full path (folder and feed names joined with
+// "\", matching the path format used by AddFeed/RemoveFeed/MoveRSSItem),
+// e.g. "Shows\Anime". Folders themselves are not included in the result.
 func (qb *Client) GetRSSFeeds(withData bool) (map[string]RSSFeed, error) {
 	params := url.Values{}
 	params.Add("withData", fmt.Sprintf("%v", withData))
@@ -30,12 +34,56 @@ func (qb *Client) GetRSSFeeds(withData bool) (map[string]RSSFeed, error) {
 		return nil, fmt.Errorf("failed to get RSS feeds. Status: %d, Response: %s", resp.StatusCode, string(body))
 	}
 
-	var feeds map[string]RSSFeed
-	if err := json.Unmarshal(body, &feeds); err != nil {
+	var tree map[string]json.RawMessage
+	if err := json.Unmarshal(body, &tree); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	feeds := make(map[string]RSSFeed)
+	if err := flattenRSSItems(tree, "", feeds); err != nil {
 		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
 
 	return feeds, nil
+}
+
+// flattenRSSItems walks a raw rss/items JSON object, decoding leaf feeds
+// (items with a "url" field) into feeds and recursing into folders
+// (items without a "url" field), prefixing nested items with their
+// parent path joined by "\".
+func flattenRSSItems(items map[string]json.RawMessage, prefix string, feeds map[string]RSSFeed) error {
+	for name, raw := range items {
+		path := name
+		if prefix != "" {
+			path = prefix + `\` + name
+		}
+
+		var probe struct {
+			URL *string `json:"url"`
+		}
+		if err := json.Unmarshal(raw, &probe); err != nil {
+			return fmt.Errorf("item %q: %w", path, err)
+		}
+
+		if probe.URL != nil {
+			var feed RSSFeed
+			if err := json.Unmarshal(raw, &feed); err != nil {
+				return fmt.Errorf("item %q: %w", path, err)
+			}
+			feeds[path] = feed
+			continue
+		}
+
+		var children map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &children); err != nil {
+			return fmt.Errorf("folder %q: %w", path, err)
+		}
+		if err := flattenRSSItems(children, path, feeds); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // AddRSSFeed adds a new RSS feed
