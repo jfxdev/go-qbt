@@ -1,6 +1,7 @@
 package qbt
 
 import (
+	"context"
 	"net/http"
 	"testing"
 	"time"
@@ -20,6 +21,7 @@ func BenchmarkCookieValidation(b *testing.B) {
 func BenchmarkCookieValidationWithoutCache(b *testing.B) {
 	client := &Client{
 		cookieValid: false,
+		ctx:         context.Background(),
 	}
 
 	b.ResetTimer()

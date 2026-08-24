@@ -56,6 +56,76 @@ func TestHandleCategoryResponse_PropagatesHTTPError(t *testing.T) {
 	}
 }
 
+func TestGetRSSFeeds(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	recorder.responses["/api/v2/rss/items"] = endpointResponse{
+		body: `{
+			"RootFeed": {"url": "https://root.example/rss", "title": "Root", "lastBuild": "", "isLoading": false, "hasError": false, "articles": []},
+			"Shows": {
+				"Anime": {"url": "https://anime.example/rss", "title": "Anime", "lastBuild": "", "isLoading": false, "hasError": false, "articles": []},
+				"Nested": {
+					"Deep Show": {"url": "https://deep.example/rss", "title": "Deep Show", "lastBuild": "", "isLoading": false, "hasError": false, "articles": []}
+				}
+			}
+		}`,
+	}
+	client := newTestClient(t, recorder.handler())
+
+	feeds, err := client.GetRSSFeeds(false)
+	if err != nil {
+		t.Fatalf("GetRSSFeeds returned error: %v", err)
+	}
+
+	if len(feeds) != 3 {
+		t.Fatalf("expected 3 feeds, got %d: %+v", len(feeds), feeds)
+	}
+
+	root, ok := feeds["RootFeed"]
+	if !ok || root.URL != "https://root.example/rss" {
+		t.Fatalf("expected root-level feed RootFeed, got %+v", feeds)
+	}
+
+	anime, ok := feeds[`Shows\Anime`]
+	if !ok || anime.URL != "https://anime.example/rss" {
+		t.Fatalf(`expected nested feed Shows\Anime, got %+v`, feeds)
+	}
+
+	deep, ok := feeds[`Shows\Nested\Deep Show`]
+	if !ok || deep.URL != "https://deep.example/rss" {
+		t.Fatalf(`expected doubly-nested feed Shows\Nested\Deep Show, got %+v`, feeds)
+	}
+
+	if _, ok := feeds["Shows"]; ok {
+		t.Fatalf("folder %q should not appear in feeds, got %+v", "Shows", feeds)
+	}
+
+	recorder.assertCalls(t, []expectedCall{
+		{Path: "/api/v2/app/version", Method: http.MethodGet},
+		{Path: "/api/v2/auth/login", Method: http.MethodPost},
+		{Path: "/api/v2/rss/items", Method: http.MethodGet},
+	})
+}
+
+func TestGetRSSFeeds_PropagatesHTTPError(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	recorder.responses["/api/v2/rss/items"] = endpointResponse{
+		statusCode: http.StatusBadRequest,
+		body:       "forbidden",
+	}
+	client := newTestClient(t, recorder.handler())
+
+	_, err := client.GetRSSFeeds(false)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to get RSS feeds") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+	if !strings.Contains(err.Error(), "forbidden") {
+		t.Fatalf("expected response body in error, got %v", err)
+	}
+}
+
 func TestSetRSSFeedURL(t *testing.T) {
 	recorder := newAPITestRecorder(t)
 	client := newTestClient(t, recorder.handler())
