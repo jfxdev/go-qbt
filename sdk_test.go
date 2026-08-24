@@ -517,3 +517,133 @@ func TestGetMatchingRSSArticles_PropagatesHTTPError(t *testing.T) {
 		t.Fatalf("expected response body in error, got %v", err)
 	}
 }
+
+func TestAddTrackers(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	client := newTestClient(t, recorder.handler())
+
+	err := client.AddTrackers("hash-1", []string{"udp://tracker1.example:80", "udp://tracker2.example:80"})
+	if err != nil {
+		t.Fatalf("AddTrackers returned error: %v", err)
+	}
+
+	recorder.assertCalls(t, []expectedCall{
+		{Path: "/api/v2/app/version", Method: http.MethodGet},
+		{Path: "/api/v2/auth/login", Method: http.MethodPost},
+		{
+			Path:   "/api/v2/torrents/addTrackers",
+			Method: http.MethodPost,
+			Form: map[string]string{
+				"hash": "hash-1",
+				"urls": "udp://tracker1.example:80\nudp://tracker2.example:80",
+			},
+		},
+	})
+}
+
+func TestAddTrackers_PropagatesHTTPError(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	recorder.responses["/api/v2/torrents/addTrackers"] = endpointResponse{
+		statusCode: http.StatusBadRequest,
+		body:       "torrent not found",
+	}
+	client := newTestClient(t, recorder.handler())
+
+	err := client.AddTrackers("hash-1", []string{"udp://tracker1.example:80"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to add trackers") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+	if !strings.Contains(err.Error(), "torrent not found") {
+		t.Fatalf("expected response body in error, got %v", err)
+	}
+}
+
+func TestRemoveTrackers(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	client := newTestClient(t, recorder.handler())
+
+	err := client.RemoveTrackers("hash-1", []string{"udp://tracker1.example:80", "udp://tracker2.example:80"})
+	if err != nil {
+		t.Fatalf("RemoveTrackers returned error: %v", err)
+	}
+
+	recorder.assertCalls(t, []expectedCall{
+		{Path: "/api/v2/app/version", Method: http.MethodGet},
+		{Path: "/api/v2/auth/login", Method: http.MethodPost},
+		{
+			Path:   "/api/v2/torrents/removeTrackers",
+			Method: http.MethodPost,
+			Form: map[string]string{
+				"hash": "hash-1",
+				"urls": "udp://tracker1.example:80\nudp://tracker2.example:80",
+			},
+		},
+	})
+}
+
+func TestRemoveTrackers_PropagatesHTTPError(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	recorder.responses["/api/v2/torrents/removeTrackers"] = endpointResponse{
+		statusCode: http.StatusBadRequest,
+		body:       "torrent not found",
+	}
+	client := newTestClient(t, recorder.handler())
+
+	err := client.RemoveTrackers("hash-1", []string{"udp://tracker1.example:80"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to remove trackers") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+	if !strings.Contains(err.Error(), "torrent not found") {
+		t.Fatalf("expected response body in error, got %v", err)
+	}
+}
+
+func TestEditTracker(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	client := newTestClient(t, recorder.handler())
+
+	err := client.EditTracker("hash-1", "udp://old.example:80", "udp://new.example:80")
+	if err != nil {
+		t.Fatalf("EditTracker returned error: %v", err)
+	}
+
+	recorder.assertCalls(t, []expectedCall{
+		{Path: "/api/v2/app/version", Method: http.MethodGet},
+		{Path: "/api/v2/auth/login", Method: http.MethodPost},
+		{
+			Path:   "/api/v2/torrents/editTracker",
+			Method: http.MethodPost,
+			Form: map[string]string{
+				"hash":    "hash-1",
+				"origUrl": "udp://old.example:80",
+				"newUrl":  "udp://new.example:80",
+			},
+		},
+	})
+}
+
+func TestEditTracker_PropagatesHTTPError(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	recorder.responses["/api/v2/torrents/editTracker"] = endpointResponse{
+		statusCode: http.StatusBadRequest,
+		body:       "tracker not found",
+	}
+	client := newTestClient(t, recorder.handler())
+
+	err := client.EditTracker("hash-1", "udp://old.example:80", "udp://new.example:80")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to edit tracker") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+	if !strings.Contains(err.Error(), "tracker not found") {
+		t.Fatalf("expected response body in error, got %v", err)
+	}
+}
