@@ -695,6 +695,52 @@ func TestForceReannounce(t *testing.T) {
 	})
 }
 
+func TestListTorrentFiles(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	recorder.responses["/api/v2/torrents/files"] = endpointResponse{
+		body: `[
+			{"index":0,"name":"a.mkv","size":100,"progress":1,"priority":1,"is_seed":false,"piece_range":[0,1],"availability":1},
+			{"index":1,"name":"b.mkv","size":200,"progress":0,"priority":0,"is_seed":false,"piece_range":[2,3],"availability":0}
+		]`,
+	}
+	client := newTestClient(t, recorder.handler())
+
+	files, err := client.ListTorrentFiles("test_hash_123")
+	if err != nil {
+		t.Fatalf("ListTorrentFiles returned error: %v", err)
+	}
+
+	if len(files) != 2 {
+		t.Fatalf("expected 2 files, got %d", len(files))
+	}
+	if files[0].Index != 0 || files[1].Index != 1 {
+		t.Fatalf("expected indexes 0 and 1, got %d and %d", files[0].Index, files[1].Index)
+	}
+}
+
+func TestSetFilePriority(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	client := newTestClient(t, recorder.handler())
+
+	if err := client.SetFilePriority("test_hash_123", []int{3, 4, 5}, 0); err != nil {
+		t.Fatalf("SetFilePriority returned error: %v", err)
+	}
+
+	recorder.assertCalls(t, []expectedCall{
+		{Path: "/api/v2/app/version", Method: http.MethodGet},
+		{Path: "/api/v2/auth/login", Method: http.MethodPost},
+		{
+			Path:   "/api/v2/torrents/filePrio",
+			Method: http.MethodPost,
+			Form: map[string]string{
+				"hash":     "test_hash_123",
+				"id":       "3|4|5",
+				"priority": "0",
+			},
+		},
+	})
+}
+
 func TestAlternativeRateLimits(t *testing.T) {
 	recorder := newAPITestRecorder(t)
 	client := newTestClient(t, recorder.handler())

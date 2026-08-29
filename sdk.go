@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/jfxdev/go-qbt/request"
@@ -362,6 +363,42 @@ func (qb *Client) ListTorrentFiles(hash string) ([]*TorrentFile, error) {
 	}
 
 	return files, nil
+}
+
+// SetFilePriority sets the download priority of one or more files within a
+// torrent. indexes are the file indexes as returned by ListTorrentFiles.
+// priority follows qBittorrent's values: 0 = do not download, 1 = normal,
+// 6 = high, 7 = maximum.
+func (qb *Client) SetFilePriority(hash string, indexes []int, priority int) error {
+	ids := make([]string, len(indexes))
+	for i, idx := range indexes {
+		ids[i] = strconv.Itoa(idx)
+	}
+
+	data := url.Values{
+		"hash":     {hash},
+		"id":       {strings.Join(ids, "|")},
+		"priority": {strconv.Itoa(priority)},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/torrents/filePrio", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to set file priority: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to set file priority. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
 }
 
 func (qb *Client) ForceRecheck(hash string) error {
