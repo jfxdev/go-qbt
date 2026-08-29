@@ -212,6 +212,7 @@ type MagnetLink struct {
 
 // TorrentFile represents a file within a torrent
 type TorrentFile struct {
+	Index        int     `json:"index"`        // File index, used by SetFilePriority
 	Name         string  `json:"name"`         // File name
 	Size         int64   `json:"size"`         // File size in bytes
 	Progress     float64 `json:"progress"`     // Download progress (0.0 to 1.0)
