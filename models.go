@@ -290,7 +290,7 @@ type TorrentPeer struct {
 	DownloadSpeed int     `json:"dl_speed"`     // Download speed
 	Files         string  `json:"files"`        // Files
 	Progress      float64 `json:"progress"`     // Progress (0.0 to 1.0)
-	Relevance     int     `json:"relevance"`    // Relevance
+	Relevance     float64 `json:"relevance"`    // Relevance (0.0-1.0)
 	Uploaded      int64   `json:"uploaded"`     // Uploaded bytes
 	UploadSpeed   int     `json:"up_speed"`     // Upload speed
 }
