@@ -724,8 +724,11 @@ func (qb *Client) GetTorrentTrackers(hash string) ([]*TorrentTracker, error) {
 func (qb *Client) GetTorrentPeers(hash string) ([]*TorrentPeer, error) {
 	params := url.Values{}
 	params.Add("hash", hash)
+	params.Add("rid", "0")
 
-	endpoint := fmt.Sprintf("%s/api/v2/torrents/peers?%s", qb.config.BaseURL, params.Encode())
+	// qBittorrent has no /api/v2/torrents/peers endpoint - per-torrent peer
+	// data is only exposed via the sync API.
+	endpoint := fmt.Sprintf("%s/api/v2/sync/torrentPeers?%s", qb.config.BaseURL, params.Encode())
 
 	resp, err := qb.doWithRetry(http.MethodGet, endpoint, nil, nil)
 	if err != nil {

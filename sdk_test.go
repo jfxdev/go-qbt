@@ -776,7 +776,7 @@ func TestBanPeers_PropagatesHTTPError(t *testing.T) {
 
 func TestGetTorrentPeers(t *testing.T) {
 	recorder := newAPITestRecorder(t)
-	recorder.responses["/api/v2/torrents/peers"] = endpointResponse{
+	recorder.responses["/api/v2/sync/torrentPeers"] = endpointResponse{
 		statusCode: http.StatusOK,
 		body: `{
 			"full_update": true,
@@ -809,7 +809,7 @@ func TestGetTorrentPeers(t *testing.T) {
 		{Path: "/api/v2/app/version", Method: http.MethodGet},
 		{Path: "/api/v2/auth/login", Method: http.MethodPost},
 		{
-			Path:   "/api/v2/torrents/peers",
+			Path:   "/api/v2/sync/torrentPeers",
 			Method: http.MethodGet,
 		},
 	})
@@ -817,7 +817,7 @@ func TestGetTorrentPeers(t *testing.T) {
 
 func TestGetTorrentPeers_PropagatesHTTPError(t *testing.T) {
 	recorder := newAPITestRecorder(t)
-	recorder.responses["/api/v2/torrents/peers"] = endpointResponse{
+	recorder.responses["/api/v2/sync/torrentPeers"] = endpointResponse{
 		statusCode: http.StatusNotFound,
 		body:       "torrent not found",
 	}
