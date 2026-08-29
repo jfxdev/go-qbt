@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -236,6 +237,14 @@ func (qb *Client) IncreaseTorrentsPriority(hash string) error {
 
 func (qb *Client) DecreaseTorrentsPriority(hash string) error {
 	return qb.updateTorrentStatus("decreasePrio", hash, nil)
+}
+
+func (qb *Client) TopTorrentsPriority(hash string) error {
+	return qb.updateTorrentStatus("topPrio", hash, nil)
+}
+
+func (qb *Client) BottomTorrentsPriority(hash string) error {
+	return qb.updateTorrentStatus("bottomPrio", hash, nil)
 }
 
 func (qb *Client) AddTorrentTags(hash string, tags []string) error {
@@ -733,15 +742,55 @@ func (qb *Client) GetTorrentPeers(hash string) ([]*TorrentPeer, error) {
 		return nil, fmt.Errorf("failed to get torrent peers. Status: %d, Response: %s", resp.StatusCode, string(body))
 	}
 
-	var peers []*TorrentPeer
-	if err := json.Unmarshal(body, &peers); err != nil {
+	var raw struct {
+		Peers map[string]*TorrentPeer `json:"peers"`
+	}
+	if err := json.Unmarshal(body, &raw); err != nil {
 		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
+
+	peers := make([]*TorrentPeer, 0, len(raw.Peers))
+	for _, peer := range raw.Peers {
+		peers = append(peers, peer)
+	}
+
+	sort.Slice(peers, func(i, j int) bool {
+		if peers[i].IP != peers[j].IP {
+			return peers[i].IP < peers[j].IP
+		}
+		return peers[i].Port < peers[j].Port
+	})
 
 	return peers, nil
 }
 
 // GetGlobalSettings gets qBittorrent global settings
+// BanPeers bans peers instance-wide, given as "ip:port"
+func (qb *Client) BanPeers(peers []string) error {
+	data := url.Values{
+		"peers": {strings.Join(peers, "|")},
+	}
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v2/transfer/banPeers", qb.config.BaseURL)
+
+	resp, err := qb.doWithRetry(http.MethodPost, endpoint, []byte(data.Encode()), headers)
+	if err != nil {
+		return fmt.Errorf("failed to ban peers: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to ban peers. Status: %d, Response: %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
 func (qb *Client) GetGlobalSettings() (*GlobalSettings, error) {
 	endpoint := fmt.Sprintf("%s/api/v2/app/preferences", qb.config.BaseURL)
 

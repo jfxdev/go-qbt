@@ -647,3 +647,190 @@ func TestEditTracker_PropagatesHTTPError(t *testing.T) {
 		t.Fatalf("expected response body in error, got %v", err)
 	}
 }
+
+func TestTopTorrentsPriority(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	client := newTestClient(t, recorder.handler())
+
+	err := client.TopTorrentsPriority("hash-1")
+	if err != nil {
+		t.Fatalf("TopTorrentsPriority returned error: %v", err)
+	}
+
+	recorder.assertCalls(t, []expectedCall{
+		{Path: "/api/v2/app/version", Method: http.MethodGet},
+		{Path: "/api/v2/auth/login", Method: http.MethodPost},
+		{
+			Path:   "/api/v2/torrents/topPrio",
+			Method: http.MethodPost,
+			Form: map[string]string{
+				"hashes": "hash-1",
+			},
+		},
+	})
+}
+
+func TestTopTorrentsPriority_PropagatesHTTPError(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	recorder.responses["/api/v2/torrents/topPrio"] = endpointResponse{
+		statusCode: http.StatusBadRequest,
+		body:       "torrent not found",
+	}
+	client := newTestClient(t, recorder.handler())
+
+	err := client.TopTorrentsPriority("hash-1")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to topPrio torrent") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+	if !strings.Contains(err.Error(), "torrent not found") {
+		t.Fatalf("expected response body in error, got %v", err)
+	}
+}
+
+func TestBottomTorrentsPriority(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	client := newTestClient(t, recorder.handler())
+
+	err := client.BottomTorrentsPriority("hash-1")
+	if err != nil {
+		t.Fatalf("BottomTorrentsPriority returned error: %v", err)
+	}
+
+	recorder.assertCalls(t, []expectedCall{
+		{Path: "/api/v2/app/version", Method: http.MethodGet},
+		{Path: "/api/v2/auth/login", Method: http.MethodPost},
+		{
+			Path:   "/api/v2/torrents/bottomPrio",
+			Method: http.MethodPost,
+			Form: map[string]string{
+				"hashes": "hash-1",
+			},
+		},
+	})
+}
+
+func TestBottomTorrentsPriority_PropagatesHTTPError(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	recorder.responses["/api/v2/torrents/bottomPrio"] = endpointResponse{
+		statusCode: http.StatusBadRequest,
+		body:       "torrent not found",
+	}
+	client := newTestClient(t, recorder.handler())
+
+	err := client.BottomTorrentsPriority("hash-1")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to bottomPrio torrent") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+	if !strings.Contains(err.Error(), "torrent not found") {
+		t.Fatalf("expected response body in error, got %v", err)
+	}
+}
+
+func TestBanPeers(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	client := newTestClient(t, recorder.handler())
+
+	err := client.BanPeers([]string{"1.2.3.4:6881", "5.6.7.8:51413"})
+	if err != nil {
+		t.Fatalf("BanPeers returned error: %v", err)
+	}
+
+	recorder.assertCalls(t, []expectedCall{
+		{Path: "/api/v2/app/version", Method: http.MethodGet},
+		{Path: "/api/v2/auth/login", Method: http.MethodPost},
+		{
+			Path:   "/api/v2/transfer/banPeers",
+			Method: http.MethodPost,
+			Form: map[string]string{
+				"peers": "1.2.3.4:6881|5.6.7.8:51413",
+			},
+		},
+	})
+}
+
+func TestBanPeers_PropagatesHTTPError(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	recorder.responses["/api/v2/transfer/banPeers"] = endpointResponse{
+		statusCode: http.StatusBadRequest,
+		body:       "invalid peer",
+	}
+	client := newTestClient(t, recorder.handler())
+
+	err := client.BanPeers([]string{"1.2.3.4:6881"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to ban peers") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+	if !strings.Contains(err.Error(), "invalid peer") {
+		t.Fatalf("expected response body in error, got %v", err)
+	}
+}
+
+func TestGetTorrentPeers(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	recorder.responses["/api/v2/torrents/peers"] = endpointResponse{
+		statusCode: http.StatusOK,
+		body: `{
+			"full_update": true,
+			"rid": 1,
+			"peers": {
+				"5.6.7.8:51413": {"ip": "5.6.7.8", "port": 51413, "client": "qBittorrent", "progress": 0.5},
+				"1.2.3.4:6881": {"ip": "1.2.3.4", "port": 6881, "client": "Transmission", "progress": 1}
+			}
+		}`,
+	}
+	client := newTestClient(t, recorder.handler())
+
+	peers, err := client.GetTorrentPeers("hash-1")
+	if err != nil {
+		t.Fatalf("GetTorrentPeers returned error: %v", err)
+	}
+
+	if len(peers) != 2 {
+		t.Fatalf("expected 2 peers, got %d", len(peers))
+	}
+
+	if peers[0].IP != "1.2.3.4" || peers[0].Port != 6881 || peers[0].Client != "Transmission" {
+		t.Fatalf("unexpected first peer: %+v", peers[0])
+	}
+	if peers[1].IP != "5.6.7.8" || peers[1].Port != 51413 || peers[1].Progress != 0.5 {
+		t.Fatalf("unexpected second peer: %+v", peers[1])
+	}
+
+	recorder.assertCalls(t, []expectedCall{
+		{Path: "/api/v2/app/version", Method: http.MethodGet},
+		{Path: "/api/v2/auth/login", Method: http.MethodPost},
+		{
+			Path:   "/api/v2/torrents/peers",
+			Method: http.MethodGet,
+		},
+	})
+}
+
+func TestGetTorrentPeers_PropagatesHTTPError(t *testing.T) {
+	recorder := newAPITestRecorder(t)
+	recorder.responses["/api/v2/torrents/peers"] = endpointResponse{
+		statusCode: http.StatusNotFound,
+		body:       "torrent not found",
+	}
+	client := newTestClient(t, recorder.handler())
+
+	_, err := client.GetTorrentPeers("hash-1")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to get torrent peers") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+	if !strings.Contains(err.Error(), "torrent not found") {
+		t.Fatalf("expected response body in error, got %v", err)
+	}
+}
