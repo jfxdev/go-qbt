@@ -126,6 +126,7 @@ type TorrentFileConfig struct {
 type TorrentResponse struct {
 	AddedOn                  int         `json:"added_on"`
 	Category                 string      `json:"category"`
+	Completed                *int64      `json:"completed"` // Completed content bytes; nil when the server omits the field.
 	CompletionOn             int64       `json:"completion_on"`
 	Dlspeed                  int         `json:"dlspeed"`
 	Downloaded               int         `json:"downloaded"`
